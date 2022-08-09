@@ -2,6 +2,8 @@ from pathlib import Path
 import tkinter.filedialog as tkFd
 import pickle, os, logging, sys
 
+__version__ = "0.1.0"
+
 PROJECT_DIR = Path(os.getenv("APPDATA") + "/Nicko's Backuper") if sys.platform == "win32" else Path.home() / ".Nicko's Backuper"
 
 class BackupFile:
