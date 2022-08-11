@@ -1,53 +1,51 @@
 from pathlib import Path
 import tkinter.filedialog as tkFd
-import pickle, os, logging, sys
+import pickle, os, logging, sys, abc
+
+from ctypes import windll
+
+windll.shcore.SetProcessDpiAwareness(1)
 
 __version__ = "0.1.0"
 
 PROJECT_DIR = Path(os.getenv("APPDATA") + "/Nicko's Backuper") if sys.platform == "win32" else Path.home() / ".Nicko's Backuper"
 
-class BackupFile:
+class BackupMeta(abc.ABC):    
     def __init__(self, origin_path:Path, destiny_path:Path = ...) -> None:
         assert origin_path.exists()
 
-        self.__origin = origin_path
-        self.__destiny = destiny_path if destiny_path != Ellipsis else None
-    
+        self._origin = origin_path
+        self._destiny = destiny_path if destiny_path != Ellipsis else None
+        self._type = "dir" if self._origin.is_dir() else "file"
+        
     @property
     def origin(self) -> Path:
         """
         The path of the origin file.
         """
-        return self.__origin
+        return self._origin
     
     @property
     def destiny(self) -> Path|None:
         """
         The path of the destiny of the backup.
         """
-        return self.__destiny
+        return self._destiny
     
     @property
-    def file_name(self) -> str:
+    def name(self) -> str:
         """
         The name of the origin file.
         """
-        return self.__origin.name
+        return self._origin.name
     
+    @abc.abstractmethod
     def backup(self) -> bool:
         """
         Backup the file.
         """
-        try:
-            with self.__origin.open("rb") as file, self.__destiny.open("wb") as backup:
-                for line in file.readlines():
-                    backup.write(line)
-        
-            return True
-        except BaseException as exc:
-            logging.error(exc)
-            return False
-        
+        pass
+
     def report(self, index:int = ...) -> str:
         """
         Return a report about the origin and the destiny of the file.
@@ -60,12 +58,31 @@ class BackupFile:
             report += index_str
             underlines -= len(index_str)
         
-        report += (" " + self.file_name[:32] + " ").center(underlines, "-") + "\n"
-        report += f"ORIGIN\t: {self.__origin}\n"
-        report += f"DESTINY\t: {self.__destiny}\n"
+        report += (" " + self.name[:32] + " ").center(underlines, "-") + "\n"
+        report += f"ORIGIN\t: {self._origin}\n"
+        report += f"DESTINY\t: {self._destiny}\n"
+        report += f"TYPE\t: {self._type.upper()}\n"
         report += "-" * 72
         
         return report
+
+class BackupFile(BackupMeta):
+    def backup(self) -> bool:
+        try:
+            with self._origin.open("rb") as file, self._destiny.open("wb") as backup:
+                for line in file.readlines():
+                    backup.write(line)
+        
+            return True
+        except BaseException as exc:
+            logging.error(exc)
+            return False
+    
+class BackupDir(BackupMeta):
+    def backup(self) -> bool:
+        for dir_path, dir_dirs, dir_files in os.walk(self._origin):
+            for file in dir_files:
+                print(Path(dir_path) / file)
 
 file_list:list[BackupFile] = []
 
@@ -116,29 +133,60 @@ def load_file_list():
             file_list = data.copy()
 
 def main():
-    enter = input(">> ")
     
-    match enter:
+    enter = input(">> ")
+    if enter.isspace() or enter == "":
+        enter = [""]
+    else:
+        enter = enter.split()
+    
+    # Fill the list with empty strings
+    for _ in range(6 - len(enter)):
+        enter.append("")
+    
+    match enter[0]:
         case "exit":
             save_file_list()
             exit()
         
-        case "add":
-            origin = ask_origin_file()
-            if origin == Path():
-                print("The file was not added.")
-                return
-            
-            destiny = ask_destiny_file(origin)
-            if destiny == Path():
-                print("The file was not added.")
-                return
-            
-            new_file = BackupFile(origin, destiny)
-            
-            file_list.append(new_file)
-            print(f"The file \"{new_file.origin.name}\" was added to the list of files.")
-            logging.info(f"The file \"{new_file.origin.name}\" was added to the list of files.")
+        case "add":            
+            match enter[1]:
+                case "file":
+                    origin = ask_origin_file()
+                    if origin == Path():
+                        print("The file was not added.")
+                        return
+                    
+                    destiny = ask_destiny_file(origin)
+                    if destiny == Path():
+                        print("The file was not added.")
+                        return
+                    
+                    new_file = BackupFile(origin, destiny)
+                    
+                    file_list.append(new_file)
+                    print(f"The file \"{new_file.origin.name}\" was added to the list.")
+                    logging.info(f"The file \"{new_file.origin.name}\" was added to the list.")
+                    
+                case "dir":
+                    origin = Path(tkFd.askdirectory(title= "Seleccionar Directorio a Respaldar", mustexist= True))
+                    if origin == Path():
+                        print("The dir was not added.")
+                        return
+                    
+                    destiny = Path(tkFd.askdirectory(title= "Seleccionar Directorio de Destino", mustexist= False))
+                    if destiny == Path():
+                        print("The dir was not added.")
+                        return
+                    
+                    new_dir = BackupDir(origin, destiny)
+                    
+                    file_list.append(new_dir)
+                    print(f"The dir \"{new_dir.origin.name}\" was added to the list.")
+                    logging.info(f"The dir \"{new_dir.origin.name}\" was added to the list.")            
+                    
+                case _:
+                    print("You must add \"file\" or \"dir\".")
         
         case "del":
             del_index = input("What index you want to delete?: ")
@@ -155,8 +203,8 @@ def main():
             
             deleted = file_list.pop(del_index)
 
-            print(f"The file \"{deleted.file_name}\" was deleted from the list.")
-            logging.info(f"The file \"{deleted.file_name}\" was deleted from the list.")
+            print(f"The file \"{deleted.name}\" was deleted from the list.")
+            logging.info(f"The file \"{deleted.name}\" was deleted from the list.")
         
         case "show":
             if len(file_list) == 0:
