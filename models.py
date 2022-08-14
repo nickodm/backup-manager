@@ -1,4 +1,5 @@
 from pathlib import Path
+from zipfile import ZipFile
 import abc, os, logging, sys, pickle
 import typing as typ
 
@@ -61,6 +62,16 @@ class BackupMeta(abc.ABC):
         report += "-" * 72
         
         return report
+    
+    def __getstate__(self):
+        state = {
+            "origin_path": self._origin,
+            "destiny_path": self._destiny
+        }
+        return state
+    
+    def __setstate__(self, state:dict):
+        self.__init__(**state)
 
 class BackupFile(BackupMeta):
     def backup(self) -> bool:
@@ -75,10 +86,87 @@ class BackupFile(BackupMeta):
             return False
     
 class BackupDir(BackupMeta):
+    def __init__(self, origin_path: Path, destiny_path: Path = ..., *, compress:bool = False) -> None:
+        super().__init__(origin_path, destiny_path)
+        self._compress = compress
+        self._save_compressed()
+    
+    @property
+    def file_count(self) -> int:
+        """
+        The count of all the files in the directory.
+        """
+        count = 0
+        for _, _, files in os.walk(self._origin):
+            count += len(files)
+            
+        return count
+    
+    @property
+    def compress(self) -> bool:
+        """
+        Whether the dir is compressed.
+        """
+        return self._compress
+    
     def backup(self) -> bool:
-        for dir_path, dir_dirs, dir_files in os.walk(self._origin):
-            for file in dir_files:
-                print(Path(dir_path) / file)
+        if self._compress:
+            return self._save_compressed()
+        
+        path_limit = 0
+        try:
+            for path, _, files in os.walk(self._origin):
+                if path_limit == 0:
+                    path_limit = len(Path(path).parts)
+                
+                for file in files:
+                    destiny:Path = self._destiny / "/".join(Path(path).parts[path_limit:]) / file
+                    if not destiny.parent.exists():
+                        destiny.parent.mkdir(parents= True)
+                    
+                    BackupFile(Path(path).joinpath(file), destiny).backup()
+        except BaseException as exc:
+            logging.exception(exc)
+            return False
+        
+        return True
+                
+    def report(self, index: int = ...) -> str:
+        report = super().report(index).splitlines()
+        report.insert(-1, f"FILES\t: {self.file_count}")
+        report.insert(-1, f"COMPRESS: {self.compress}")
+        
+        return "\n".join(report)
+    
+    def _save_compressed(self) -> bool:
+        """
+        Save the dir in a compressed file in `self.destiny`.
+        """
+        if self._destiny.is_dir():
+            destiny = self._destiny / (self._origin.name + ".zip")
+        else:
+            destiny = self._destiny
+            
+        try:        
+            with ZipFile(destiny, "w") as zip_stream:
+                path_limit = 0
+                for path, _, files in os.walk(self._origin):
+                    if path_limit == 0:
+                        path_limit = len(Path(path).parts)
+                    
+                    for file in files:
+                        with Path(path).joinpath(file) as read_path:
+                                zip_stream.write(read_path, arcname= Path("/".join(read_path.parts[path_limit:])))
+        except BaseException as exc:
+            logging.exception(exc)
+            return False
+        
+        return True
+    
+    def __getstate__(self):
+        state = super().__getstate__()
+        state['compress'] = self._compress
+        return state
 
 class PathBackupArray(typ.Sequence[BackupMeta]):
     def __init__(self, name:str = "") -> None:
@@ -175,7 +263,7 @@ class PathBackupArray(typ.Sequence[BackupMeta]):
             
             # If the file is not the last in the list, print a space
             if self._data.index(file) < len(self._data) - 1:
-                report += ""
+                report += "\n"
         
         return report        
     
