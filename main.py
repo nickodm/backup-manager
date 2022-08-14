@@ -1,90 +1,14 @@
 from pathlib import Path
 import tkinter.filedialog as tkFd
-import pickle, os, logging, sys, abc
-
+import pickle, logging
 from ctypes import windll
+from models import *
 
 windll.shcore.SetProcessDpiAwareness(1)
 
 __version__ = "0.1.0"
 
-PROJECT_DIR = Path(os.getenv("APPDATA") + "/Nicko's Backuper") if sys.platform == "win32" else Path.home() / ".Nicko's Backuper"
-
-class BackupMeta(abc.ABC):    
-    def __init__(self, origin_path:Path, destiny_path:Path = ...) -> None:
-        assert origin_path.exists()
-
-        self._origin = origin_path
-        self._destiny = destiny_path if destiny_path != Ellipsis else None
-        self._type = "dir" if self._origin.is_dir() else "file"
-        
-    @property
-    def origin(self) -> Path:
-        """
-        The path of the origin file.
-        """
-        return self._origin
-    
-    @property
-    def destiny(self) -> Path|None:
-        """
-        The path of the destiny of the backup.
-        """
-        return self._destiny
-    
-    @property
-    def name(self) -> str:
-        """
-        The name of the origin file.
-        """
-        return self._origin.name
-    
-    @abc.abstractmethod
-    def backup(self) -> bool:
-        """
-        Backup the file.
-        """
-        pass
-
-    def report(self, index:int = ...) -> str:
-        """
-        Return a report about the origin and the destiny of the file.
-        """
-        report = ""
-        underlines = 72
-        
-        if index != Ellipsis:
-            index_str = f"[{index}] "
-            report += index_str
-            underlines -= len(index_str)
-        
-        report += (" " + self.name[:32] + " ").center(underlines, "-") + "\n"
-        report += f"ORIGIN\t: {self._origin}\n"
-        report += f"DESTINY\t: {self._destiny}\n"
-        report += f"TYPE\t: {self._type.upper()}\n"
-        report += "-" * 72
-        
-        return report
-
-class BackupFile(BackupMeta):
-    def backup(self) -> bool:
-        try:
-            with self._origin.open("rb") as file, self._destiny.open("wb") as backup:
-                for line in file.readlines():
-                    backup.write(line)
-        
-            return True
-        except BaseException as exc:
-            logging.error(exc)
-            return False
-    
-class BackupDir(BackupMeta):
-    def backup(self) -> bool:
-        for dir_path, dir_dirs, dir_files in os.walk(self._origin):
-            for file in dir_files:
-                print(Path(dir_path) / file)
-
-file_list:list[BackupFile] = []
+file_list:list[BackupMeta] = []
 
 def ask_origin_file():
     path = tkFd.askopenfilename(
@@ -236,7 +160,7 @@ if __name__ == "__main__":
     logging.basicConfig(filename= PROJECT_DIR / "logs" / "Nicko's Backuper Last Log.log", level= logging.INFO, 
                         format= "[%(asctime)s] %(levelname)s: %(message)s", datefmt= "%b %d, %Y %H:%M:%S")
     
-    logging.info("Starting program...")
+    logging.info("Starting...")
     
     if not PROJECT_DIR.exists():
         logging.info("Creating the project directory...")
