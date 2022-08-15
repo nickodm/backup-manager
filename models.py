@@ -3,7 +3,7 @@ from zipfile import ZipFile
 import abc, os, logging, sys, pickle
 import typing as typ
 
-__all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR"]
+__all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR", "PathBackupArray"]
 
 PROJECT_DIR = Path(os.getenv("APPDATA") + "/Nicko's Backuper") if sys.platform == "win32" else Path.home() / ".Nicko's Backuper"
 
@@ -176,7 +176,7 @@ class PathBackupArray(typ.Sequence[BackupMeta]):
         
     def add(self, value:BackupMeta) -> None:
         assert isinstance(value, BackupMeta), "'value' must be an instance of a subclass of BackupMeta."
-        self._data.append(BackupMeta)
+        self._data.append(value)
         
     def clear(self) -> None:
         self._data.clear()
@@ -231,7 +231,7 @@ class PathBackupArray(typ.Sequence[BackupMeta]):
         
         logging.info(f"Saving the array on '{path}'...")
         with path.open("wb") as stream:
-            pickle.dump(self._data, stream)
+            pickle.dump(self, stream)
         
     def load(self, *, path:Path = ...) -> None:
         """
@@ -248,7 +248,7 @@ class PathBackupArray(typ.Sequence[BackupMeta]):
         with path.open("rb") as stream:
             data = pickle.load(stream)
             if isinstance(data, type(self)):
-                self._data = data
+                self._data = data._data
                 
     def report(self) -> str:
         """

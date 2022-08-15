@@ -1,6 +1,6 @@
 from pathlib import Path
 import tkinter.filedialog as tkFd
-import pickle, logging
+import logging
 from ctypes import windll
 from models import *
 
@@ -8,7 +8,7 @@ windll.shcore.SetProcessDpiAwareness(1)
 
 __version__ = "0.1.0"
 
-file_list:list[BackupMeta] = []
+main_list = PathBackupArray("main")
 
 def ask_origin_file():
     path = tkFd.askopenfilename(
@@ -30,32 +30,6 @@ def ask_destiny_file(origin_path:Path):
     
     return Path(path)
 
-def save_file_list():
-    """
-    Save the list of files.
-    """
-    print("Saving list of files...")
-    logging.info("Saving the file list...")
-    with PROJECT_DIR.joinpath("files").open("wb") as stream:
-        pickle.dump(file_list, stream)
-
-def load_file_list():
-    """
-    Load the list of files.
-    """
-    global file_list
-    
-    if not PROJECT_DIR.joinpath("files").exists():
-        return
-    
-    print("Loading list of files...")
-    logging.info("Loading the file list...")
-    
-    with PROJECT_DIR.joinpath("files").open("rb") as stream:
-        data = pickle.load(stream)
-        if isinstance(data, list):
-            file_list = data.copy()
-
 def main():
     
     enter = input(">> ")
@@ -70,7 +44,7 @@ def main():
     
     match enter[0]:
         case "exit":
-            save_file_list()
+            main_list.save()
             exit()
         
         case "add":            
@@ -88,7 +62,7 @@ def main():
                     
                     new_file = BackupFile(origin, destiny)
                     
-                    file_list.append(new_file)
+                    main_list.add(new_file)
                     print(f"The file \"{new_file.origin.name}\" was added to the list.")
                     logging.info(f"The file \"{new_file.origin.name}\" was added to the list.")
                     
@@ -103,9 +77,9 @@ def main():
                         print("The dir was not added.")
                         return
                     
-                    new_dir = BackupDir(origin, destiny)
+                    new_dir = BackupDir(origin, destiny, compress= enter[2].lower() in ("--compress", "-c"))
                     
-                    file_list.append(new_dir)
+                    main_list.add(new_dir)
                     print(f"The dir \"{new_dir.origin.name}\" was added to the list.")
                     logging.info(f"The dir \"{new_dir.origin.name}\" was added to the list.")            
                     
@@ -113,46 +87,38 @@ def main():
                     print("You must add \"file\" or \"dir\".")
         
         case "del":
-            del_index = input("What index you want to delete?: ")
+            if enter[1] == "":
+                print("You must input a number next to the word 'del'.")
+                return
             
-            if not del_index.isdigit():
+            if not enter[1].isdigit():
                 print("You must input a real number.")
                 return
             
-            del_index = int(del_index)
+            enter[1] = int(enter[1])
 
-            if len(file_list) <= del_index or del_index < 0:
-                print(f"The index must be between 0 and {len(file_list) - 1}.")
+            if len(main_list) <= enter[1] or enter[1] < 0:
+                print(f"The index must be between 0 and {len(main_list) - 1}.")
                 return
             
-            deleted = file_list.pop(del_index)
+            deleted = main_list.pop(enter[1])
 
             print(f"The file \"{deleted.name}\" was deleted from the list.")
             logging.info(f"The file \"{deleted.name}\" was deleted from the list.")
         
         case "show":
-            if len(file_list) == 0:
-                print("The list of files is empty.")
-            
-            for file in file_list:
-                print(file.report(file_list.index(file)))
-                
-                # If the file is not the last in the list, print a space
-                if file_list.index(file) < len(file_list) - 1:
-                    print()
+            print(main_list.report())
         
         case "backup":
-            print(f"Creating backups of {len(file_list)} files...")
-            logging.info("Starting backups...")
-            for file in file_list:
-                if file.backup():
-                    print(f"The file \"{file.origin.name}\" was successfully copied.")
-                    logging.info(f"The file \"{file.origin.name}\" was successfully copied.")
+            print(f"Creating backups of {len(main_list)} files...")
+            for file_name, result, file_instance in main_list.backup_all():
+                if result:
+                    print(f"The file \"{file_name}\" was successfully copied.")
+                    logging.info(f"The file \"{file_name}\" was successfully copied.")
                 else:
-                    print(f"The file \"{file.origin.name}\" cannot be copied.")
-                    logging.info(f"The file \"{file.origin.name}\" cannot be copied.")
-            logging.info("Backups finished.")
-                    
+                    print(f"The file \"{file_name}\" cannot be copied.")
+                    logging.info(f"The file \"{file_name}\" cannot be copied.")
+            
         case _:
             print("Unknown command")
 
@@ -167,6 +133,7 @@ if __name__ == "__main__":
         PROJECT_DIR.mkdir()
         PROJECT_DIR.joinpath("logs").mkdir()
 
-    load_file_list()
+    print("Loading list...")
+    main_list.load()
     while True:
         main()
