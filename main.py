@@ -4,8 +4,6 @@ import logging
 from ctypes import windll
 from models import *
 
-windll.shcore.SetProcessDpiAwareness(1)
-
 __version__ = "0.1.0"
 
 main_list = PathBackupArray("main")
@@ -31,7 +29,6 @@ def ask_destiny_file(origin_path:Path):
     return Path(path)
 
 def main():
-    
     enter = input(">> ")
     if enter.isspace() or enter == "":
         enter = [""]
@@ -44,7 +41,9 @@ def main():
     
     match enter[0]:
         case "exit":
+            print("Saving list...")
             main_list.save()
+            print("Exiting...")
             exit()
         
         case "add":            
@@ -123,6 +122,8 @@ def main():
             print("Unknown command")
 
 if __name__ == "__main__":
+    windll.shcore.SetProcessDpiAwareness(1) # To avoid blurred windows
+
     logging.basicConfig(filename= PROJECT_DIR / "logs" / "Nicko's Backuper Last Log.log", level= logging.INFO, 
                         format= "[%(asctime)s] %(levelname)s: %(message)s", datefmt= "%b %d, %Y %H:%M:%S")
     

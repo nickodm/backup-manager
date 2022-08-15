@@ -222,6 +222,14 @@ class PathBackupArray(typ.Sequence[BackupMeta]):
         return_var._data = list(filter(lambda x: x._type == "dir", self._data))
         return return_var
     
+    def copy(self):
+        """
+        Return a copy of the array.
+        """
+        copy = PathBackupArray(self.name)
+        copy._data = self._data.copy()
+        return copy
+    
     def save(self, *, path:Path = ...) -> None:
         """
         Save the array in a binary file.
@@ -249,6 +257,7 @@ class PathBackupArray(typ.Sequence[BackupMeta]):
             data = pickle.load(stream)
             if isinstance(data, type(self)):
                 self._data = data._data
+                self.name = data.name
                 
     def report(self) -> str:
         """
@@ -278,7 +287,3 @@ class PathBackupArray(typ.Sequence[BackupMeta]):
         
     def __len__(self) -> int:
         return len(self._data)
-    
-a = PathBackupArray()
-
-
