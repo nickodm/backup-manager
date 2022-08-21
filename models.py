@@ -1,11 +1,12 @@
 from pathlib import Path
 from zipfile import ZipFile
 import abc, os, logging, sys, pickle
-import typing as typ
+import typing as typ, tkinter.filedialog as tkFd
 
-__all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR", "PathBackupArray"]
+__all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR", "PathBackupArray", "get_file_origin", "get_file_destiny",
+           "get_dir_origin", "get_dir_destiny"]
 
-PROJECT_DIR = Path(os.getenv("APPDATA") + "/Nicko's Backuper") if sys.platform == "win32" else Path.home() / ".Nicko's Backuper"
+PROJECT_DIR:Path = Path(os.getenv("APPDATA") + "/Nicko's Backup Manager") if sys.platform == "win32" else Path.home() / ".Nicko's Backup Manager"
 
 class BackupMeta(abc.ABC):
     def __init__(self, origin_path:Path, destiny_path:Path = ...) -> None:
@@ -13,7 +14,6 @@ class BackupMeta(abc.ABC):
 
         self._origin = origin_path
         self._destiny = destiny_path if destiny_path != Ellipsis else None
-        self._type:typ.Literal['dir', 'file'] = "dir" if self._origin.is_dir() else "file"
         
     @property
     def origin(self) -> Path:
@@ -36,10 +36,17 @@ class BackupMeta(abc.ABC):
         """
         return self._origin.name
     
+    @property
+    def type(self) -> typ.Literal['dir', 'file']:
+        """
+        Whether the path is a dir or a file. Another way to know this is `isinstance(x, BackupFile/BackupDir)`
+        """
+        return "dir" if self._origin.is_dir() else "file"
+    
     @abc.abstractmethod
     def backup(self) -> bool:
         """
-        Backup the file.
+        Backup the source.
         """
         pass
 
@@ -58,7 +65,7 @@ class BackupMeta(abc.ABC):
         report += (" " + self.name[:32] + " ").center(underlines, "-") + "\n"
         report += f"ORIGIN\t: {self._origin}\n"
         report += f"DESTINY\t: {self._destiny}\n"
-        report += f"TYPE\t: {self._type.upper()}\n"
+        report += f"TYPE\t: {self.type.upper()}\n"
         report += "-" * 72
         
         return report
@@ -89,7 +96,6 @@ class BackupDir(BackupMeta):
     def __init__(self, origin_path: Path, destiny_path: Path = ..., *, compress:bool = False) -> None:
         super().__init__(origin_path, destiny_path)
         self._compress = compress
-        self._save_compressed()
     
     @property
     def file_count(self) -> int:
@@ -105,7 +111,7 @@ class BackupDir(BackupMeta):
     @property
     def compress(self) -> bool:
         """
-        Whether the dir is compressed.
+        Whether the dir will be compressed.
         """
         return self._compress
     
@@ -169,10 +175,24 @@ class BackupDir(BackupMeta):
         return state
 
 class PathBackupArray(typ.Sequence[BackupMeta]):
+    """
+    Base class for arrays of paths of files or directories that will be copied.
+    """
     def __init__(self, name:str = "") -> None:
         self.name = name
         
         self._data:list[BackupMeta] = []
+        
+    @property
+    def total_files(self):
+        """
+        The total of files in the array. It is not the same as 'len'.
+        """
+        total = len(self.files_only())
+        for backup_dir in self.dirs_only():
+            total += backup_dir.file_count
+            
+        return total        
         
     def add(self, value:BackupMeta) -> None:
         assert isinstance(value, BackupMeta), "'value' must be an instance of a subclass of BackupMeta."
@@ -202,25 +222,22 @@ class PathBackupArray(typ.Sequence[BackupMeta]):
         Backup all the paths in the array.
         """
         logging.info(f"Starting backups of {self.name!r} ({len(self._data)} items)...")
-        for file in self._data:
-            yield (file.name, file.backup(), file)
+        for meta in self._data:
+            yield (meta.name, meta.backup(), meta)
         logging.info(f"The backup of {self.name!r} has ended.")
     
-    def files_only(self):
+    def files_only(self) -> tuple[BackupFile]:
         """
         Return a copy of the array with BackupFiles only.
         """
-        return_var = PathBackupArray()
-        return_var._data = list(filter(lambda x: x._type == "file", self._data))
-        return return_var
+        return tuple(filter(lambda x: isinstance(x, BackupFile), self._data))
     
-    def dirs_only(self):
+    def dirs_only(self) -> tuple[BackupDir]:
         """
         Return a copy of the array with BackupDirs only.
         """
-        return_var = PathBackupArray()
-        return_var._data = list(filter(lambda x: x._type == "dir", self._data))
-        return return_var
+        
+        return tuple(filter(lambda x: isinstance(x, BackupDir), self._data))
     
     def copy(self):
         """
@@ -287,3 +304,47 @@ class PathBackupArray(typ.Sequence[BackupMeta]):
         
     def __len__(self) -> int:
         return len(self._data)
+
+def get_file_destiny(origin_path:Path):
+    path = tkFd.asksaveasfilename(
+        title= "Seleccionar Ruta para Respaldar",
+        initialfile= "[BACKUP] " + origin_path.name,
+        defaultextension= origin_path.suffix,
+        filetypes= (("*" + origin_path.suffix, origin_path.suffix), 
+        )
+    )
+
+    return Path(path)
+    
+def get_file_origin():
+    path = tkFd.askopenfilename(
+        title= "Seleccionar Archivo a Respaldar",
+        filetypes= (
+            ("Cualquier Archivo", "*.*"), 
+        )
+    )
+
+    return Path(path)
+
+def get_dir_origin():
+    path = tkFd.askdirectory(
+        title= "Seleccionar Directorio a Respaldar",
+        mustexist= True
+    )
+    
+    return Path(path)
+
+def get_dir_destiny(*, zip_file:bool = False):
+    if zip_file:
+        path = tkFd.asksaveasfilename(
+            title= "Seleccionar Archivo de Destino",
+            filetypes= (("Archivo ZIP", "*.zip"), ),
+            defaultextension= "*.zip"
+        )
+    else:
+        path = tkFd.askdirectory(
+                title= "Seleccionar Directorio de Destino",
+                mustexist= False
+            )
+        
+    return Path(path)
