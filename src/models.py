@@ -20,20 +20,43 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from pathlib import Path
 from zipfile import ZipFile
-import abc, os, logging, sys, pickle
+from abc import ABC, abstractmethod
+import os, logging, sys, pickle
 import typing as typ, tkinter.filedialog as tkFd
 
-__all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR", "PathBackupArray", "get_file_origin", "get_file_destiny",
+__all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR", "ResourcesArray", "get_file_origin", "get_file_destiny",
            "get_dir_origin", "get_dir_destiny"]
 
 PROJECT_DIR:Path = Path(os.getenv("APPDATA") + "/Nicko's Backup Manager") if sys.platform == "win32" else Path.home() / ".Nicko's Backup Manager"
 
-class BackupMeta(abc.ABC):
-    def __init__(self, origin_path:Path, destiny_path:Path = ...) -> None:
-        assert origin_path.exists()
+def format_size(size:int|float) -> str:
+    """
+    Format a size in a string. For example, convert `1024` to `"1KB"`.
+    """
+    size = float(size)
+    
+    units = {
+        0: "B",  # Byte
+        1: "KB", # Kilobyte
+        2: "MB", # Megabyte
+        3: "GB", # Gigabyte
+        4: "TB"  # Terabyte
+    }
+    
+    count = 0
+    while size >= 1024 and count <= 4:
+        size /= 1024
+        count += 1
+        
+    if size.is_integer():
+        return "%i%s"%(size, units.get(count, "TB"))
+        
+    return "%.2f%s"%(size, units.get(count, "TB"))
 
+class BackupMeta(ABC):
+    def __init__(self, origin_path:Path, destiny_path:Path) -> None:
         self._origin = origin_path
-        self._destiny = destiny_path if destiny_path != Ellipsis else None
+        self._destiny = destiny_path
         
     @property
     def origin(self) -> Path:
@@ -63,10 +86,25 @@ class BackupMeta(abc.ABC):
         """
         return "dir" if self._origin.is_dir() else "file"
     
-    @abc.abstractmethod
+    @property
+    @abstractmethod
+    def resource_size(self) -> int:
+        """
+        The size of the resource in bytes.
+        """
+        pass
+    
+    @abstractmethod
     def backup(self) -> bool:
         """
-        Backup the source.
+        Backup the resource.
+        """
+        pass
+    
+    @abstractmethod
+    def restore(self) -> bool:
+        """
+        Restore the resource.
         """
         pass
 
@@ -86,6 +124,7 @@ class BackupMeta(abc.ABC):
         report += f"ORIGIN\t: {self._origin}\n"
         report += f"DESTINY\t: {self._destiny}\n"
         report += f"TYPE\t: {self.type.upper()}\n"
+        report += f"SIZE\t: {format_size(self.resource_size)}\n"
         report += "-" * 72
         
         return report
@@ -99,9 +138,38 @@ class BackupMeta(abc.ABC):
     
     def __setstate__(self, state:dict):
         self.__init__(**state)
+        
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, t, v, tck):
+        logging.exception(v)
+        
+    def __str__(self):
+        return self.report()
+    
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}(origin= {self._origin}, destiny= {self._destiny})"
+
 
 class BackupFile(BackupMeta):
+    def __init__(self, origin_path: Path, destiny_path: Path = ...) -> None:
+        if not origin_path.is_file():
+            raise NotAFileError(
+                "The resource must be a file."
+            )
+
+        super().__init__(origin_path, destiny_path)
+    
+    @property
+    def resource_size(self) -> int:
+        return self._origin.stat(follow_symlinks= True).st_size
+    
     def backup(self) -> bool:
+        if not self._origin.exists():
+            logging.warning("Tried to backup a resource that doesn't exits.")
+            return False
+        
         try:
             with self._origin.open("rb") as file, self._destiny.open("wb") as backup:
                 for line in file.readlines():
@@ -109,13 +177,44 @@ class BackupFile(BackupMeta):
         
             return True
         except BaseException as exc:
-            logging.error(exc)
+            logging.exception(exc)
+            return False
+        
+    def restore(self) -> bool:
+        if not self._destiny.exists():
+            logging.warning("Tried to restore a backup that doesn't exists.")
+            return False
+
+        try:
+            with self._destiny.open("rb") as file, self._origin.open("wb") as restore:
+                for line in file.readlines():
+                    restore.write(line)
+            
+            logging.info(f"{self._destiny.name!r} was successfully restored.")
+            return True
+        except BaseException as exc:
+            logging.info(f"{self._destiny.name!r} wasn't restored.")
+            logging.exception(exc)
             return False
     
 class BackupDir(BackupMeta):
     def __init__(self, origin_path: Path, destiny_path: Path = ..., *, compress:bool = False) -> None:
+        if not origin_path.is_dir():
+            raise NotADirectoryError(
+                "The resource must be a directory."
+            )
+        
         super().__init__(origin_path, destiny_path)
         self._compress = compress
+        
+    @property
+    def resource_size(self) -> int:
+        size = 0
+        for path, _, files in os.walk(self._origin):
+            for file in files:
+                size += Path(path).joinpath(file).stat().st_size
+            
+        return size
     
     @property
     def file_count(self) -> int:
@@ -156,7 +255,32 @@ class BackupDir(BackupMeta):
             return False
         
         return True
+    
+    def restore(self) -> bool:
+        if self._destiny.is_dir():
+            path_limit = 0
+            try:
+                for path, _, files in os.walk(self._destiny):
+                    if path_limit == 0:
+                        path_limit = len(Path(path).parts)
+                    
+                    for file in files:
+                        origin:Path = self._origin / "/".join(Path(path).parts[path_limit:]) / file
+                        if not origin.parent.exists():
+                            origin.parent.mkdir(parents= True)
+                        
+                        BackupFile(origin, Path(path).joinpath(file)).restore()
                 
+                return True
+            except BaseException as exc:
+                logging.exception(exc)
+                return False
+        else:
+            with ZipFile(self._destiny, "r") as zip_fp:
+                zip_fp.extractall(self._origin)
+            
+            return True
+
     def report(self, index: int = ...) -> str:
         report = super().report(index).splitlines()
         report.insert(-1, f"FILES\t: {self.file_count}")
@@ -194,7 +318,7 @@ class BackupDir(BackupMeta):
         state['compress'] = self._compress
         return state
 
-class PathBackupArray(typ.Sequence[BackupMeta]):
+class ResourcesArray(typ.Sequence[BackupMeta]):
     """
     Base class for arrays of paths of files or directories that will be copied.
     """
@@ -212,7 +336,18 @@ class PathBackupArray(typ.Sequence[BackupMeta]):
         for backup_dir in self.dirs_only():
             total += backup_dir.file_count
             
-        return total        
+        return total
+    
+    @property
+    def total_size(self):
+        """
+        The size of all the resources in the array.
+        """
+        size = 0
+        for meta in self._data:
+            size += meta.resource_size
+            
+        return size
         
     def add(self, value:BackupMeta) -> None:
         assert isinstance(value, BackupMeta), "'value' must be an instance of a subclass of BackupMeta."
@@ -245,25 +380,33 @@ class PathBackupArray(typ.Sequence[BackupMeta]):
         for meta in self._data:
             yield (meta.name, meta.backup(), meta)
         logging.info(f"The backup of {self.name!r} has ended.")
+        
+    def restore_all(self):
+        """
+        Restore all the paths in the array.
+        """
+        logging.info(f"Starting restore of {self.name!r} ({len(self._data)} items)...")
+        for meta in self._data:
+            yield meta.name, meta.restore(), meta
+        logging.info(f"The restoring of {self.name!r} has ended.")
     
     def files_only(self) -> tuple[BackupFile]:
         """
-        Return a copy of the array with BackupFiles only.
+        Return a copy of the array with files only.
         """
         return tuple(filter(lambda x: isinstance(x, BackupFile), self._data))
     
     def dirs_only(self) -> tuple[BackupDir]:
         """
-        Return a copy of the array with BackupDirs only.
+        Return a copy of the array with dirs only.
         """
-        
         return tuple(filter(lambda x: isinstance(x, BackupDir), self._data))
     
     def copy(self):
         """
         Return a copy of the array.
         """
-        copy = PathBackupArray(self.name)
+        copy = ResourcesArray(self.name)
         copy._data = self._data.copy()
         return copy
     
@@ -298,7 +441,7 @@ class PathBackupArray(typ.Sequence[BackupMeta]):
                 
     def report(self) -> str:
         """
-        Return all the report of the BackupMeta's in the array in a string.
+        Return all the reports of the resources in the array in a string.
         """
         report = ""
         if len(self._data) == 0:
@@ -310,6 +453,9 @@ class PathBackupArray(typ.Sequence[BackupMeta]):
             # If the file is not the last in the list, print a space
             if self._data.index(file) < len(self._data) - 1:
                 report += "\n"
+                
+        report += f"\n\nTOTAL FILES: {self.total_files}\n"
+        report += f"TOTAL SIZE:  {format_size(self.total_size)}"
         
         return report        
     
@@ -324,6 +470,8 @@ class PathBackupArray(typ.Sequence[BackupMeta]):
         
     def __len__(self) -> int:
         return len(self._data)
+    
+class PathBackupArray(ResourcesArray): ...
 
 def get_file_destiny(origin_path:Path):
     path = tkFd.asksaveasfilename(
@@ -354,17 +502,29 @@ def get_dir_origin():
     
     return Path(path)
 
-def get_dir_destiny(*, zip_file:bool = False):
+def get_dir_destiny(*, zip_file:bool = False, file_name:str = ""):
     if zip_file:
         path = tkFd.asksaveasfilename(
             title= "Seleccionar Archivo de Destino",
             filetypes= (("Archivo ZIP", "*.zip"), ),
-            defaultextension= "*.zip"
+            defaultextension= "*.zip",
+            initialfile= " [BACKUP] " + file_name
         )
     else:
         path = tkFd.askdirectory(
                 title= "Seleccionar Directorio de Destino",
-                mustexist= False
+                mustexist= False,
+                initialdir= " [BACKUP] " + file_name
             )
         
     return Path(path)
+
+#* ----------------------
+#*      EXCEPTIONS
+#* ----------------------
+
+class NotAFileError(OSError):
+    """
+    The operation works in files only.
+    """
+    pass

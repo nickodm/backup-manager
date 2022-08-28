@@ -23,7 +23,7 @@ from models import *
 
 __version__ = "0.1.1"
 
-main_list = PathBackupArray("main")
+main_list = ResourcesArray("main")
 
 def main():
     enter = input(">> ")
@@ -70,7 +70,7 @@ def main():
                         print("The dir was not added.")
                         return
                     
-                    destiny = get_dir_destiny(zip_file= compress)
+                    destiny = get_dir_destiny(zip_file= compress, file_name= origin.name)
                     if destiny == Path():
                         print("The dir was not added.")
                         return
@@ -107,8 +107,18 @@ def main():
             print(main_list.report())
         
         case "backup":
-            print(f"Creating backups of {main_list} files...")
+            print(f"Creating backups of {len(main_list)} files...")
             for file_name, result, _ in main_list.backup_all():
+                if result:
+                    print(f"\"{file_name}\" was successfully copied.")
+                    logging.info(f"\"{file_name}\" was successfully copied.")
+                else:
+                    print(f"\"{file_name}\" cannot be copied.")
+                    logging.info(f"\"{file_name}\" cannot be copied.")
+                    
+        case "restore":
+            print(f"Restoring {len(main_list)} files...")
+            for file_name, result, _ in main_list.restore_all():
                 if result:
                     print(f"\"{file_name}\" was successfully copied.")
                     logging.info(f"\"{file_name}\" was successfully copied.")
@@ -145,9 +155,14 @@ if __name__ == "__main__":
     if not PROJECT_DIR.exists():
         PROJECT_DIR.mkdir()
         PROJECT_DIR.joinpath("logs").mkdir()
-    
-    logging.basicConfig(filename= PROJECT_DIR / "logs/Last Log.log", level= logging.INFO, 
-                        format= "[%(asctime)s] %(levelname)s: %(message)s", datefmt= "%b %d, %Y %H:%M:%S")
+        
+    with PROJECT_DIR.joinpath("logs/Last Log.log") as log_path:
+        if log_path.exists():
+            from os import remove
+            remove(log_path)
+            
+        logging.basicConfig(filename= log_path, level= logging.INFO, 
+                            format= "[%(asctime)s] %(levelname)s: %(message)s", datefmt= "%b %d, %Y %H:%M:%S")
     
     logging.info("Starting...")
     
