@@ -20,13 +20,30 @@ from pathlib import Path
 import logging
 from ctypes import windll
 from models import *
+from sys import exit as sys_exit
 
 __version__ = "0.1.1"
 
 main_list = ResourcesArray("main")
 
-def main():
-    enter = input(">> ")
+all_lists = AllLists()
+
+def exit():
+    main_list.save()
+    all_lists.save()
+    sys_exit()
+    
+def prompt(prompt:str = ""):
+    try:
+        enter = input(prompt)
+    except (KeyboardInterrupt, EOFError) as exc:
+        if isinstance(exc, KeyboardInterrupt):
+            print("^C")
+        
+        print("Saving list...")
+        print("Exiting...")
+        exit()
+
     if enter.isspace() or enter == "":
         enter = [""]
     else:
@@ -35,11 +52,16 @@ def main():
     # Fill the list with empty strings
     for _ in range(6 - len(enter)):
         enter.append("")
+
+    return enter
+
+def main():
+    
+    enter = prompt(">> ")
     
     match enter[0]:
         case "exit":
             print("Saving list...")
-            main_list.save()
             print("Exiting...")
             exit()
         
@@ -126,6 +148,35 @@ def main():
                     print(f"\"{file_name}\" cannot be copied.")
                     logging.info(f"\"{file_name}\" cannot be copied.")
                     
+        case "list":
+            match enter[1]:
+                case "show":
+                    print(all_lists.mention())
+                    
+                case "select":
+                    ...
+                    
+                case "create":
+                    name = "".join(prompt("Enter a name for the list: "))
+                    if name in ("exit", "cancel"):
+                        print("The list was not created.")
+                        return
+                    
+                    all_lists.add(ResourcesArray(name))
+                    print(f"Created list \"{name}\".")
+                    
+                case "import":
+                    ...
+                    
+                case "export":
+                    ...
+                    
+                case "remove":
+                    ...
+                    
+                case _:
+                    ...
+                    
         case "license":
             print(
 """
@@ -174,6 +225,7 @@ under certain conditions; type 'license' for details.
 """
     )
     print("Loading list...")
+    all_lists.load()
     main_list.load()
     
     while True:

@@ -25,7 +25,7 @@ import os, logging, sys, pickle
 import typing as typ, tkinter.filedialog as tkFd
 
 __all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR", "ResourcesArray", "get_file_origin", "get_file_destiny",
-           "get_dir_origin", "get_dir_destiny"]
+           "get_dir_origin", "get_dir_destiny", "AllLists"]
 
 PROJECT_DIR:Path = Path(os.getenv("APPDATA") + "/Nicko's Backup Manager") if sys.platform == "win32" else Path.home() / ".Nicko's Backup Manager"
 
@@ -470,8 +470,88 @@ class ResourcesArray(typ.Sequence[BackupMeta]):
         
     def __len__(self) -> int:
         return len(self._data)
+
+# Convert PathBackupArrays to ResourcesArrays
+class PathBackupArray(ResourcesArray):
+    def __new__(cls):
+        return super().__new__().copy()
+
+class AllLists():
+    def __init__(self) -> None:
+        self._data:list[ResourcesArray] = []
+        
+    def load(self):
+        if not PROJECT_DIR.joinpath("all_lists").exists():
+            return
+        
+        with PROJECT_DIR.joinpath("all_lists").open("rb") as fp:
+            data:AllLists = pickle.load(fp)
+            if isinstance(data, AllLists) and isinstance(data._data, list):
+                self._data = data._data
     
-class PathBackupArray(ResourcesArray): ...
+    def save(self):
+        with PROJECT_DIR.joinpath("all_lists").open("wb") as fp:
+            pickle.dump(self, fp)
+    
+    def add(self, value:ResourcesArray):
+        assert isinstance(value, ResourcesArray)
+        self._data.append(self.__check_repeteance(value))
+    
+    def get(self, index:int, default:ResourcesArray = ...) -> ResourcesArray:
+        try:
+            return self._data[index]
+        except:
+            if default != Ellipsis:
+                return default
+            
+            raise
+    
+    def pop(self, index:int) -> ResourcesArray: 
+        return self._data.pop(index)
+
+    def remove(self, value:ResourcesArray):
+        return self._data.remove(value)
+    
+    def index(self, value:ResourcesArray) -> int:
+        return self._data.index(value)
+    
+    def mention(self) -> str:
+        """
+        Mention all the lists that are in the list.
+        """
+        if len(self._data) == 0:
+            return "There are not lists."
+
+        string = ""
+
+        for index, array in enumerate(self._data):
+            string += "[%i] - \"%s\""%(index, array.name[:32])
+            if len(array.name) >= 32:
+                string += "...,"
+                
+            string += " | %i elements"%len(array)
+            
+            if index + 1 < len(self._data):
+                string += "\n"
+        
+        return string
+    
+    def __check_repeteance(self, value:ResourcesArray):
+        if not value in self._data:
+            return value
+        
+        raise RepeteanceError(
+            "The list is repeated."
+        )
+        
+    def __getitem__(self, index):
+        return self._data[index]
+    
+    def __len__(self):
+        return len(self._data)
+    
+    def __iter__(self):
+        return iter(self._data)
 
 def get_file_destiny(origin_path:Path):
     path = tkFd.asksaveasfilename(
@@ -526,5 +606,11 @@ def get_dir_destiny(*, zip_file:bool = False, file_name:str = ""):
 class NotAFileError(OSError):
     """
     The operation works in files only.
+    """
+    pass
+
+class RepeteanceError(Exception):
+    """
+    The value is repeated.
     """
     pass
