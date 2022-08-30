@@ -21,6 +21,7 @@ import logging
 from ctypes import windll
 from models import *
 from sys import exit as sys_exit
+import tkinter.filedialog as tkFd
 
 __version__ = "0.1.1"
 
@@ -157,7 +158,7 @@ def main():
                     ...
                     
                 case "create":
-                    name = "".join(prompt("Enter a name for the list: "))
+                    name = " ".join(prompt("Enter a name for the list: "))
                     if name in ("exit", "cancel"):
                         print("The list was not created.")
                         return
@@ -166,16 +167,72 @@ def main():
                     print(f"Created list \"{name}\".")
                     
                 case "import":
-                    ...
+                    path = tkFd.askopenfilename(
+                        title= "Import List",
+                        filetypes= (("JSON File", "*.json"), ),
+                        defaultextension= "*.json"
+                    )
+                    
+                    if path == "":
+                        print("The list was not imported.")
+                        return
+                    
+                    importing = ResourcesArray.from_import(path)
+                    
+                    if "-d" or "--direct" not in enter:
+                        print(f"Is \"{importing.name}\" the list?")
+                        while True:
+                            match prompt("[y|n] Confirm>> ")[0].lower():
+                                case "y":
+                                    break
+                                
+                                case "n":
+                                    print("The list was not imported.")
+                                    return
+                                
+                    all_lists.add(importing)
+                    print(f"The list \"{importing.name}\" was imported.")
                     
                 case "export":
-                    ...
+                    if not enter[2].isdigit():
+                        print("You must input a real index.")
+                        return
+                    
+                    index = int(enter[2])
+                    
+                    if all_lists.get(index, None) == None:
+                        print("The index is out of range.")
+                        return
+                    
+                    path = tkFd.asksaveasfilename(
+                        title= "Export List",
+                        filetypes= (("JSON File", "*.json"), ),
+                        defaultextension= "*.json",
+                        initialfile= "%s - Backup List.json"%all_lists[index].name
+                    )
+                    
+                    if path == "":
+                        print("The list was not exported.")
+                        return
+                    
+                    all_lists[index].export(path)
+                    print(f"The list was exported to \"{Path(path).resolve()}\".")
                     
                 case "remove":
-                    ...
+                    if not enter[2].isdigit():
+                        print("You must input a real number.")
+                        return
+                    
+                    index = int(enter[2])
+                    
+                    if all_lists.get(index, None) == None:
+                        print("The index is out of range")
+                        return
+                    
+                    print(f"The \"{all_lists.pop(index).name}\" list was removed.")
                     
                 case _:
-                    ...
+                    print("Unknown command")
                     
         case "license":
             print(

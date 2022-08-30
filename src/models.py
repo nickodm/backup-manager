@@ -21,7 +21,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from pathlib import Path
 from zipfile import ZipFile
 from abc import ABC, abstractmethod
-import os, logging, sys, pickle
+import os, logging, sys, pickle, json
 import typing as typ, tkinter.filedialog as tkFd
 
 __all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR", "ResourcesArray", "get_file_origin", "get_file_destiny",
@@ -57,6 +57,14 @@ class BackupMeta(ABC):
     def __init__(self, origin_path:Path, destiny_path:Path) -> None:
         self._origin = origin_path
         self._destiny = destiny_path
+        
+    @classmethod
+    def from_dict(cls, dictt:dict):
+        self = object.__new__(cls)
+        self._origin = dictt['origin_path']
+        self._destiny = dictt['destiny_path']
+        
+        return self
         
     @property
     def origin(self) -> Path:
@@ -128,6 +136,16 @@ class BackupMeta(ABC):
         report += "-" * 72
         
         return report
+    
+    def to_dict(self) -> dict:
+        """
+        Return self represented in a dict.
+        """
+        return {
+            "origin_path": self._origin,
+            "destiny_path": self._destiny,
+            "type": self.type
+        }
     
     def __getstate__(self):
         state = {
@@ -206,6 +224,12 @@ class BackupDir(BackupMeta):
         
         super().__init__(origin_path, destiny_path)
         self._compress = compress
+        
+    @classmethod
+    def from_dict(cls, dictt: dict):
+        self = super().from_dict(dictt)
+        self._compress = dictt.get("compress", False)
+        return self
         
     @property
     def resource_size(self) -> int:
@@ -287,6 +311,11 @@ class BackupDir(BackupMeta):
         report.insert(-1, f"COMPRESS: {self.compress}")
         
         return "\n".join(report)
+
+    def to_dict(self) -> dict:
+        dictt:dict = super().to_dict()
+        dictt['compress'] = self._compress
+        return dictt
     
     def _save_compressed(self) -> bool:
         """
@@ -326,6 +355,29 @@ class ResourcesArray(typ.Sequence[BackupMeta]):
         self.name = name
         
         self._data:list[BackupMeta] = []
+        
+    @classmethod
+    def from_import(cls, path:os.PathLike): 
+        with open(path, "r") as fp:
+            loaded:dict = json.load(fp)
+        
+        if not isinstance(loaded, dict):
+            raise TypeError(
+                "The loaded data is not a dict."
+            )
+                
+        self = object.__new__(cls)
+        self.name = loaded.get("list_name", "")
+        
+        self._data = []
+        for dictt in loaded.get("content", []):
+            dictt:dict
+            if dictt['type'] == "dir":
+                self._data.append(BackupDir.from_dict(dictt))
+            elif dictt['type'] == "file":
+                self._data.append(BackupFile.from_dict(dictt))
+        
+        return self        
         
     @property
     def total_files(self):
@@ -457,7 +509,17 @@ class ResourcesArray(typ.Sequence[BackupMeta]):
         report += f"\n\nTOTAL FILES: {self.total_files}\n"
         report += f"TOTAL SIZE:  {format_size(self.total_size)}"
         
-        return report        
+        return report
+    
+    def export(self, destiny:os.PathLike) -> None:
+        """
+        Serialize the Array to a json object.
+        """
+        with open(destiny, "w") as fp:
+            json.dump({
+                "list_name": self.name,
+                "content": [meta.to_dict() for meta in self._data]
+            }, fp, indent= 4)
     
     def __iter__(self) -> typ.Iterator[BackupMeta]:
         return iter(self._data)
