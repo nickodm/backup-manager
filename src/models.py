@@ -25,7 +25,7 @@ import os, logging, sys, pickle, json
 import typing as typ, tkinter.filedialog as tkFd
 
 __all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR", "ResourcesArray", "get_file_origin", "get_file_destiny",
-           "get_dir_origin", "get_dir_destiny", "AllLists"]
+           "get_dir_origin", "get_dir_destiny", "AllLists", "NextRoundAdvice"]
 
 PROJECT_DIR:Path = Path(os.getenv("APPDATA") + "/Nicko's Backup Manager") if sys.platform == "win32" else Path.home() / ".Nicko's Backup Manager"
 
@@ -172,10 +172,10 @@ class BackupMeta(ABC):
 
 class BackupFile(BackupMeta):
     def __init__(self, origin_path: Path, destiny_path: Path = ...) -> None:
-        if not origin_path.is_file():
-            raise NotAFileError(
-                "The resource must be a file."
-            )
+        # if not origin_path.is_file():
+        #     raise NotAFileError(
+        #         "The resource must be a file."
+        #     )
 
         super().__init__(origin_path, destiny_path)
     
@@ -217,10 +217,10 @@ class BackupFile(BackupMeta):
     
 class BackupDir(BackupMeta):
     def __init__(self, origin_path: Path, destiny_path: Path = ..., *, compress:bool = False) -> None:
-        if not origin_path.is_dir():
-            raise NotADirectoryError(
-                "The resource must be a directory."
-            )
+        # if not origin_path.is_dir():
+        #     raise NotADirectoryError(
+        #         "The resource must be a directory."
+        #     )
         
         super().__init__(origin_path, destiny_path)
         self._compress = compress
@@ -541,6 +541,24 @@ class PathBackupArray(ResourcesArray):
 class AllLists():
     def __init__(self) -> None:
         self._data:list[ResourcesArray] = []
+        self._selected = None
+        
+    @property
+    def selected(self) -> ResourcesArray:
+        """
+        The list that is selected.
+        """
+        return self._selected
+    
+    @property
+    def selected_index(self) -> str:
+        """
+        The index of the selected list.
+        """
+        if self._selected == None:
+            return "X"
+        
+        return str(self._data.index(self.selected))
         
     def load(self):
         if not PROJECT_DIR.joinpath("all_lists").exists():
@@ -550,6 +568,7 @@ class AllLists():
             data:AllLists = pickle.load(fp)
             if isinstance(data, AllLists) and isinstance(data._data, list):
                 self._data = data._data
+                self._selected = data._selected
     
     def save(self):
         with PROJECT_DIR.joinpath("all_lists").open("wb") as fp:
@@ -597,6 +616,13 @@ class AllLists():
                 string += "\n"
         
         return string
+    
+    def select(self, index:int) -> ResourcesArray:
+        """
+        Select a list and return it.
+        """
+        self._selected = self._data[index]
+        return self._selected
     
     def __check_repeteance(self, value:ResourcesArray):
         if not value in self._data:
@@ -674,5 +700,11 @@ class NotAFileError(OSError):
 class RepeteanceError(Exception):
     """
     The value is repeated.
+    """
+    pass
+
+class NextRoundAdvice(Exception):
+    """
+    Exception to jump to the next round of the mainloop.
     """
     pass

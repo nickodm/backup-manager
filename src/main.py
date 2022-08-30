@@ -25,16 +25,16 @@ import tkinter.filedialog as tkFd
 
 __version__ = "0.1.1"
 
-main_list = ResourcesArray("main")
+# main_list = ResourcesArray("main")
 
 all_lists = AllLists()
 
 def exit():
-    main_list.save()
+    # main_list.save()
     all_lists.save()
     sys_exit()
     
-def prompt(prompt:str = ""):
+def prompt(prompt:str = "", *, extension:int = 12):
     try:
         enter = input(prompt)
     except (KeyboardInterrupt, EOFError) as exc:
@@ -51,14 +51,26 @@ def prompt(prompt:str = ""):
         enter = enter.split()
     
     # Fill the list with empty strings
-    for _ in range(6 - len(enter)):
+    for _ in range(extension - len(enter)):
         enter.append("")
 
     return enter
 
-def main():
+def check_index(num:str) -> int:
+    if not num.isdigit():
+        print("You must input a real index.")
+        raise NextRoundAdvice
     
-    enter = prompt(">> ")
+    index = int(num)
+    
+    if all_lists.get(index, None) == None:
+        print("The index is out of range.")
+        raise NextRoundAdvice
+        
+    return index
+
+def main():
+    enter = prompt(f"[{all_lists.selected_index}] >> ")
     
     match enter[0]:
         case "exit":
@@ -81,7 +93,7 @@ def main():
                     
                     new_file = BackupFile(origin, destiny)
                     
-                    main_list.add(new_file)
+                    all_lists.selected.add(new_file)
                     print(f"The file \"{new_file.origin.name}\" was added to the list.")
                     logging.info(f"The file \"{new_file.origin.name}\" was added to the list.")
                     
@@ -100,7 +112,7 @@ def main():
                     
                     new_dir = BackupDir(origin, destiny, compress= compress)
                     
-                    main_list.add(new_dir)
+                    all_lists.selected.add(new_dir)
                     print(f"The dir \"{new_dir.origin.name}\" was added to the list.")
                     logging.info(f"The dir \"{new_dir.origin.name}\" was added to the list.")            
                     
@@ -117,21 +129,21 @@ def main():
             
             enter[1] = int(enter[1])
 
-            if len(main_list) <= enter[1] or enter[1] < 0:
-                print(f"The index must be between 0 and {len(main_list) - 1}.")
+            if len(all_lists.selected) <= enter[1] or enter[1] < 0:
+                print(f"The index must be between 0 and {len(all_lists.s) - 1}.")
                 return
             
-            deleted = main_list.pop(enter[1])
+            deleted = all_lists.selected.pop(enter[1])
 
             print(f"The {deleted.type} \"{deleted.name}\" was deleted from the list.")
             logging.info(f"The {deleted.type} \"{deleted.name}\" was deleted from the list.")
         
         case "show":
-            print(main_list.report())
+            print(all_lists.selected.report())
         
         case "backup":
-            print(f"Creating backups of {len(main_list)} files...")
-            for file_name, result, _ in main_list.backup_all():
+            print(f"Creating backups of {len(all_lists.selected)} files...")
+            for file_name, result, _ in all_lists.selected.backup_all():
                 if result:
                     print(f"\"{file_name}\" was successfully copied.")
                     logging.info(f"\"{file_name}\" was successfully copied.")
@@ -140,8 +152,8 @@ def main():
                     logging.info(f"\"{file_name}\" cannot be copied.")
                     
         case "restore":
-            print(f"Restoring {len(main_list)} files...")
-            for file_name, result, _ in main_list.restore_all():
+            print(f"Restoring {len(all_lists.selected)} files...")
+            for file_name, result, _ in all_lists.selected.restore_all():
                 if result:
                     print(f"\"{file_name}\" was successfully copied.")
                     logging.info(f"\"{file_name}\" was successfully copied.")
@@ -155,10 +167,14 @@ def main():
                     print(all_lists.mention())
                     
                 case "select":
-                    ...
+                    index = check_index(enter[2])
+
+                    print("The \"%s\" list was selected."%all_lists.select(index).name)
                     
                 case "create":
                     name = " ".join(prompt("Enter a name for the list: "))
+                    name = name.strip()
+
                     if name in ("exit", "cancel"):
                         print("The list was not created.")
                         return
@@ -194,16 +210,8 @@ def main():
                     print(f"The list \"{importing.name}\" was imported.")
                     
                 case "export":
-                    if not enter[2].isdigit():
-                        print("You must input a real index.")
-                        return
-                    
-                    index = int(enter[2])
-                    
-                    if all_lists.get(index, None) == None:
-                        print("The index is out of range.")
-                        return
-                    
+                    index = check_index(enter[2])
+
                     path = tkFd.asksaveasfilename(
                         title= "Export List",
                         filetypes= (("JSON File", "*.json"), ),
@@ -219,18 +227,27 @@ def main():
                     print(f"The list was exported to \"{Path(path).resolve()}\".")
                     
                 case "remove":
-                    if not enter[2].isdigit():
-                        print("You must input a real number.")
-                        return
-                    
-                    index = int(enter[2])
-                    
-                    if all_lists.get(index, None) == None:
-                        print("The index is out of range")
-                        return
-                    
+                    index = check_index(enter[2])
+
                     print(f"The \"{all_lists.pop(index).name}\" list was removed.")
                     
+                case "rename":
+                    index = check_index(enter[2])
+                    
+                    print(f"Input a new name to \"{all_lists[index].name}\".")
+                    new_name = " ".join(prompt(">> "))
+                    new_name = new_name.strip()
+                    while True:
+                        match prompt("[y|n] Confirm>> ")[0].lower():
+                            case "y":
+                                all_lists[index].name = new_name
+                                print("The list was renamed.")
+                                return
+                            
+                            case "n":
+                                print("The list was not renamed.")
+                                return
+                
                 case _:
                     print("Unknown command")
                     
@@ -283,7 +300,10 @@ under certain conditions; type 'license' for details.
     )
     print("Loading list...")
     all_lists.load()
-    main_list.load()
+    # main_list.load()
     
     while True:
-        main()
+        try:
+            main()
+        except NextRoundAdvice:
+            pass
