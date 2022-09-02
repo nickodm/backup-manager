@@ -25,12 +25,9 @@ import tkinter.filedialog as tkFd
 
 __version__ = "0.1.1"
 
-# main_list = ResourcesArray("main")
-
 all_lists = AllLists()
 
 def exit():
-    # main_list.save()
     all_lists.save()
     sys_exit()
     
@@ -69,6 +66,57 @@ def check_index(num:str) -> int:
         
     return index
 
+def check_selected() -> None:
+    if all_lists.selected == None:
+        print("First, you must select a list.")
+        raise NextRoundAdvice()
+
+def get_file_destiny(origin_path:Path):
+    path = tkFd.asksaveasfilename(
+        title= "Seleccionar Ruta para Respaldar",
+        initialfile= "[BACKUP] " + origin_path.name,
+        defaultextension= origin_path.suffix,
+        filetypes= (("*" + origin_path.suffix, origin_path.suffix), 
+        )
+    )
+
+    return Path(path)
+    
+def get_file_origin():
+    path = tkFd.askopenfilename(
+        title= "Seleccionar Archivo a Respaldar",
+        filetypes= (
+            ("Cualquier Archivo", "*.*"), 
+        )
+    )
+
+    return Path(path)
+
+def get_dir_origin():
+    path = tkFd.askdirectory(
+        title= "Seleccionar Directorio a Respaldar",
+        mustexist= True
+    )
+    
+    return Path(path)
+
+def get_dir_destiny(*, zip_file:bool = False, file_name:str = ""):
+    if zip_file:
+        path = tkFd.asksaveasfilename(
+            title= "Seleccionar Archivo de Destino",
+            filetypes= (("Archivo ZIP", "*.zip"), ),
+            defaultextension= "*.zip",
+            initialfile= " [BACKUP] " + file_name
+        )
+    else:
+        path = tkFd.askdirectory(
+                title= "Seleccionar Directorio de Destino",
+                mustexist= False,
+                initialdir= " [BACKUP] " + file_name
+            )
+        
+    return Path(path)
+
 def main():
     enter = prompt(f"[{all_lists.selected_index}] >> ")
     
@@ -78,7 +126,8 @@ def main():
             print("Exiting...")
             exit()
         
-        case "add":            
+        case "add":
+            check_selected()
             match enter[1]:
                 case "file":
                     origin = get_file_origin()
@@ -120,6 +169,7 @@ def main():
                     print("You must add \"file\" or \"dir\".")
         
         case "del":
+            check_selected()
             if enter[1] == "":
                 print("You must input a number next to the word 'del'.")
                 return
@@ -130,7 +180,7 @@ def main():
             enter[1] = int(enter[1])
 
             if len(all_lists.selected) <= enter[1] or enter[1] < 0:
-                print(f"The index must be between 0 and {len(all_lists.s) - 1}.")
+                print(f"The index must be between 0 and {len(all_lists.selected) - 1}.")
                 return
             
             deleted = all_lists.selected.pop(enter[1])
@@ -139,9 +189,11 @@ def main():
             logging.info(f"The {deleted.type} \"{deleted.name}\" was deleted from the list.")
         
         case "show":
+            check_selected()
             print(all_lists.selected.report())
         
         case "backup":
+            check_selected()
             print(f"Creating backups of {len(all_lists.selected)} files...")
             for file_name, result, _ in all_lists.selected.backup_all():
                 if result:
@@ -152,6 +204,7 @@ def main():
                     logging.info(f"\"{file_name}\" cannot be copied.")
                     
         case "restore":
+            check_selected()
             print(f"Restoring {len(all_lists.selected)} files...")
             for file_name, result, _ in all_lists.selected.restore_all():
                 if result:
@@ -164,7 +217,13 @@ def main():
         case "list":
             match enter[1]:
                 case "show":
-                    print(all_lists.mention())
+                    if enter[2] == "":
+                        print(all_lists.mention())
+                        return
+                    
+                    index = check_index(enter[2])
+                    
+                    print(all_lists[index].report())
                     
                 case "select":
                     index = check_index(enter[2])
@@ -195,7 +254,11 @@ def main():
                     
                     importing = ResourcesArray.from_import(path)
                     
-                    if "-d" or "--direct" not in enter:
+                    if importing in all_lists:
+                        print(f"There is already a list named \"{importing.name}\".")
+                        return
+
+                    if not ("-d" in enter or "--direct" in enter):
                         print(f"Is \"{importing.name}\" the list?")
                         while True:
                             match prompt("[y|n] Confirm>> ")[0].lower():
@@ -300,7 +363,6 @@ under certain conditions; type 'license' for details.
     )
     print("Loading list...")
     all_lists.load()
-    # main_list.load()
     
     while True:
         try:

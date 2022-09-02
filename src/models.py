@@ -24,8 +24,7 @@ from abc import ABC, abstractmethod
 import os, logging, sys, pickle, json
 import typing as typ, tkinter.filedialog as tkFd
 
-__all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR", "ResourcesArray", "get_file_origin", "get_file_destiny",
-           "get_dir_origin", "get_dir_destiny", "AllLists", "NextRoundAdvice"]
+__all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR", "ResourcesArray", "AllLists", "NextRoundAdvice"]
 
 PROJECT_DIR:Path = Path(os.getenv("APPDATA") + "/Nicko's Backup Manager") if sys.platform == "win32" else Path.home() / ".Nicko's Backup Manager"
 
@@ -168,17 +167,17 @@ class BackupMeta(ABC):
     
     def __repr__(self) -> str:
         return f"{type(self).__name__}(origin= {self._origin}, destiny= {self._destiny})"
-
+    
+    def __eq__(self, value):
+        if isinstance(value, type(self)):
+            return self._origin == value._origin and self._destiny == value._destiny
+        
+        return False
+    
+    def __ne__(self, value):
+        return not self.__eq__(value)
 
 class BackupFile(BackupMeta):
-    def __init__(self, origin_path: Path, destiny_path: Path = ...) -> None:
-        # if not origin_path.is_file():
-        #     raise NotAFileError(
-        #         "The resource must be a file."
-        #     )
-
-        super().__init__(origin_path, destiny_path)
-    
     @property
     def resource_size(self) -> int:
         return self._origin.stat(follow_symlinks= True).st_size
@@ -217,11 +216,6 @@ class BackupFile(BackupMeta):
     
 class BackupDir(BackupMeta):
     def __init__(self, origin_path: Path, destiny_path: Path = ..., *, compress:bool = False) -> None:
-        # if not origin_path.is_dir():
-        #     raise NotADirectoryError(
-        #         "The resource must be a directory."
-        #     )
-        
         super().__init__(origin_path, destiny_path)
         self._compress = compress
         
@@ -346,6 +340,9 @@ class BackupDir(BackupMeta):
         state = super().__getstate__()
         state['compress'] = self._compress
         return state
+
+    def __eq__(self, value) -> bool:
+        return super().__eq__(value) and self._compress == value._compress
 
 class ResourcesArray(typ.Sequence[BackupMeta]):
     """
@@ -497,7 +494,7 @@ class ResourcesArray(typ.Sequence[BackupMeta]):
         """
         report = ""
         if len(self._data) == 0:
-            return "The list of files is empty"
+            return "The list is empty"
         
         for index, file in enumerate(self._data):
             report += file.report(index)
@@ -532,7 +529,13 @@ class ResourcesArray(typ.Sequence[BackupMeta]):
         
     def __len__(self) -> int:
         return len(self._data)
+    
+    def __contains__(self, value: object) -> bool:
+        if isinstance(value, BackupMeta):
+            return (value._origin, value._destiny) in map(lambda x: (x._origin, x._destiny), self._data)
 
+        return False
+    
 # Convert PathBackupArrays to ResourcesArrays
 class PathBackupArray(ResourcesArray):
     def __new__(cls):
@@ -575,7 +578,7 @@ class AllLists():
             pickle.dump(self, fp)
     
     def add(self, value:ResourcesArray):
-        assert isinstance(value, ResourcesArray)
+        assert isinstance(value, ResourcesArray)   
         self._data.append(self.__check_repeteance(value))
     
     def get(self, index:int, default:ResourcesArray = ...) -> ResourcesArray:
@@ -625,13 +628,13 @@ class AllLists():
         return self._selected
     
     def __check_repeteance(self, value:ResourcesArray):
-        if not value in self._data:
-            return value
+        if value.name in map(lambda x: x.name, self._data):
+            raise RepeteanceError(
+                "The list is repeated."
+            )
         
-        raise RepeteanceError(
-            "The list is repeated."
-        )
-        
+        return value
+                
     def __getitem__(self, index):
         return self._data[index]
     
@@ -640,52 +643,13 @@ class AllLists():
     
     def __iter__(self):
         return iter(self._data)
-
-def get_file_destiny(origin_path:Path):
-    path = tkFd.asksaveasfilename(
-        title= "Seleccionar Ruta para Respaldar",
-        initialfile= "[BACKUP] " + origin_path.name,
-        defaultextension= origin_path.suffix,
-        filetypes= (("*" + origin_path.suffix, origin_path.suffix), 
-        )
-    )
-
-    return Path(path)
     
-def get_file_origin():
-    path = tkFd.askopenfilename(
-        title= "Seleccionar Archivo a Respaldar",
-        filetypes= (
-            ("Cualquier Archivo", "*.*"), 
-        )
-    )
+    def __contains__(self, value):
+        if isinstance(value, ResourcesArray):
+            return value.name in map(lambda x: x.name, self._data)
 
-    return Path(path)
-
-def get_dir_origin():
-    path = tkFd.askdirectory(
-        title= "Seleccionar Directorio a Respaldar",
-        mustexist= True
-    )
+        return False
     
-    return Path(path)
-
-def get_dir_destiny(*, zip_file:bool = False, file_name:str = ""):
-    if zip_file:
-        path = tkFd.asksaveasfilename(
-            title= "Seleccionar Archivo de Destino",
-            filetypes= (("Archivo ZIP", "*.zip"), ),
-            defaultextension= "*.zip",
-            initialfile= " [BACKUP] " + file_name
-        )
-    else:
-        path = tkFd.askdirectory(
-                title= "Seleccionar Directorio de Destino",
-                mustexist= False,
-                initialdir= " [BACKUP] " + file_name
-            )
-        
-    return Path(path)
 
 #* ----------------------
 #*      EXCEPTIONS
