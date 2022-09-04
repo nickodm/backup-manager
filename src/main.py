@@ -298,8 +298,12 @@ def main():
                     index = check_index(enter[2])
                     
                     print(f"Input a new name to \"{all_lists[index].name}\".")
-                    new_name = " ".join(prompt(">> "))
-                    new_name = new_name.strip()
+                    new_name = " ".join(prompt(">> ")).strip()
+                    
+                    if new_name in map(lambda x: x.name, all_lists):
+                        print(f"There is already a list named \"{new_name}\".")
+                        return
+                    
                     while True:
                         match prompt("[y|n] Confirm>> ")[0].lower():
                             case "y":
