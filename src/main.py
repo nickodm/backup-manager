@@ -344,6 +344,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """)
         case "cls"|"clear":
             clear_terminal()
+
+        case "version"|"ver":
+            print(f"Nicko's Backup Manager - v{__version__}")
         
         case "":
             pass
