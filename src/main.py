@@ -31,6 +31,11 @@ def exit():
     all_lists.save()
     sys_exit()
     
+def clear_terminal():
+    from os import system
+    from sys import platform
+    system("cls" if platform == "win32" else "clear")
+    
 def prompt(prompt:str = "", *, extension:int = 12):
     try:
         enter = input(prompt)
@@ -337,7 +342,12 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """)
-            
+        case "cls"|"clear":
+            clear_terminal()
+        
+        case "":
+            pass
+        
         case _:
             print("Unknown command")
 
