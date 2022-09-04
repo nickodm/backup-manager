@@ -23,7 +23,7 @@ from models import *
 from sys import exit as sys_exit
 import tkinter.filedialog as tkFd
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 all_lists = AllLists()
 
