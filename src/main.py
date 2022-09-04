@@ -78,7 +78,7 @@ def check_selected() -> None:
 
 def get_file_destiny(origin_path:Path):
     path = tkFd.asksaveasfilename(
-        title= "Seleccionar Ruta para Respaldar",
+        title= "Backup File Destiny",
         initialfile= "[BACKUP] " + origin_path.name,
         defaultextension= origin_path.suffix,
         filetypes= (("*" + origin_path.suffix, origin_path.suffix), 
@@ -89,7 +89,7 @@ def get_file_destiny(origin_path:Path):
     
 def get_file_origin():
     path = tkFd.askopenfilename(
-        title= "Seleccionar Archivo a Respaldar",
+        title= "Backup File",
         filetypes= (
             ("Cualquier Archivo", "*.*"), 
         )
@@ -99,7 +99,7 @@ def get_file_origin():
 
 def get_dir_origin():
     path = tkFd.askdirectory(
-        title= "Seleccionar Directorio a Respaldar",
+        title= "Backup Dir",
         mustexist= True
     )
     
@@ -108,14 +108,14 @@ def get_dir_origin():
 def get_dir_destiny(*, zip_file:bool = False, file_name:str = ""):
     if zip_file:
         path = tkFd.asksaveasfilename(
-            title= "Seleccionar Archivo de Destino",
+            title= "Backup Dir Destiny",
             filetypes= (("Archivo ZIP", "*.zip"), ),
             defaultextension= "*.zip",
             initialfile= " [BACKUP] " + file_name
         )
     else:
         path = tkFd.askdirectory(
-                title= "Seleccionar Directorio de Destino",
+                title= "Backup Dir Destiny",
                 mustexist= False,
                 initialdir= " [BACKUP] " + file_name
             )
