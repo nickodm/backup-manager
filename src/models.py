@@ -22,7 +22,7 @@ from pathlib import Path
 from zipfile import ZipFile
 from abc import ABC, abstractmethod
 import os, logging, sys, pickle, json
-import typing as typ, tkinter.filedialog as tkFd
+import typing as typ, datetime as dt
 
 __all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR", "ResourcesArray", "AllLists", "NextRoundAdvice"]
 
@@ -52,10 +52,70 @@ def format_size(size:int|float) -> str:
         
     return "%.2f%s"%(size, units.get(count, "TB"))
 
+def format_delta(time:dt.timedelta, *, since_max:bool = True, levels:int = 1) -> str:
+    """
+    Format a `datetime.timedelta` to a string.
+    """
+    assert levels > 0
+    
+    all:dict[str, int] = {
+       "years": 0,
+       "months": 0,
+       "weeks": 0,
+       "days": time.days,
+       "hours": 0,
+       "minutes": 0,
+       "seconds": time.seconds 
+    }
+    
+    while all['seconds'] >= 60:
+        all['minutes'] += 1
+        all['seconds'] -= 60
+        
+    while all['minutes'] >= 60:
+        all['hours'] += 1
+        all['minutes'] -= 60
+
+    while all['hours'] >= 24:
+        all['days'] += 1
+        all['hours'] -= 24
+        
+    while all['days'] >= 7:
+        all['weeks'] += 1
+        all['days'] -= 7
+
+    while all['weeks'] >= 4:
+        all['months'] += 1
+        all['weeks'] -= 4
+
+    while all['months'] >= 12:
+        all['years'] += 1
+        all['months'] -= 12
+        
+    buffer:list[str] = []
+    
+    count = 0    
+    for name, value in all.items():
+        if since_max and value <= 0:
+            continue
+
+        name = name if value != 1 else name[:-1]
+        buffer.append(f"{value} {name}")
+        
+        count += 1
+        if count == levels:
+            break
+    
+    if len(buffer) < 2:
+        return " ".join(buffer)
+    
+    return ", ".join(buffer[:-1]) + " and " + buffer[-1]
+
 class BackupMeta(ABC):
     def __init__(self, origin_path:Path, destiny_path:Path) -> None:
         self._origin = origin_path
         self._destiny = destiny_path
+        self._last_backup:dt.datetime|None = None
         
     @classmethod
     def from_dict(cls, dictt:dict):
@@ -68,7 +128,7 @@ class BackupMeta(ABC):
     @property
     def origin(self) -> Path:
         """
-        The path of the origin file.
+        The path of the origin resource.
         """
         return self._origin
     
@@ -82,7 +142,7 @@ class BackupMeta(ABC):
     @property
     def name(self) -> str:
         """
-        The name of the origin file.
+        The name of the origin resource.
         """
         return self._origin.name
     
@@ -92,6 +152,13 @@ class BackupMeta(ABC):
         Whether the path is a dir or a file. Another way to know this is `isinstance(x, BackupFile/BackupDir)`
         """
         return "dir" if self._origin.is_dir() else "file"
+
+    @property
+    def last_backup(self) -> dt.datetime|None:
+        """
+        The last time when the resource was backed up.
+        """
+        return self._last_backup
     
     @property
     @abstractmethod
@@ -114,7 +181,7 @@ class BackupMeta(ABC):
         Restore the resource.
         """
         pass
-
+    
     def report(self, index:int = ...) -> str:
         """
         Return a report about the origin and the destiny of the file.
@@ -132,6 +199,13 @@ class BackupMeta(ABC):
         report += f"DESTINY\t: {self._destiny}\n"
         report += f"TYPE\t: {self.type.upper()}\n"
         report += f"SIZE\t: {format_size(self.resource_size)}\n"
+        
+        if self.last_backup != None:
+            diff = dt.datetime.now() - self._last_backup
+            report += f"LAST\t: {self._last_backup.strftime('%B %d, %Y; %H:%M:%S')} ({format_delta(diff)} ago)\n"
+        else:
+            report += "LAST\t: N/A\n"
+        
         report += "-" * 72
         
         return report
@@ -143,18 +217,28 @@ class BackupMeta(ABC):
         return {
             "origin_path": self._origin,
             "destiny_path": self._destiny,
-            "type": self.type
-        }
+            "type": self.type,
+            "last": self._last_backup
+        }    
     
     def __getstate__(self):
         state = {
-            "origin_path": self._origin,
-            "destiny_path": self._destiny
+            "for_init": {
+                "origin_path": self._origin,
+                "destiny_path": self._destiny
+            },
+            "type": self.type,
+            "last": self._last_backup
         }
         return state
     
     def __setstate__(self, state:dict):
-        self.__init__(**state)
+        if "for_init" in state.keys():
+            self.__init__(**state['for_init'])
+            self._last_backup = state.get('last', None)
+        else: # Support for old versions
+            if "origin_path" in state.keys() and "destiny_path" in state.keys():
+                self.__init__(**state)
         
     def __enter__(self):
         return self
@@ -187,11 +271,16 @@ class BackupFile(BackupMeta):
             logging.warning("Tried to backup a resource that doesn't exits.")
             return False
         
+        if self._origin.stat().st_mtime != self._destiny.stat().st_mtime:
+            logging.info(f"{self.name!r} has not been changed.")
+            return False
+        
         try:
             with self._origin.open("rb") as file, self._destiny.open("wb") as backup:
                 for line in file.readlines():
                     backup.write(line)
-        
+
+            self._last_backup = dt.datetime.now()
             return True
         except BaseException as exc:
             logging.exception(exc)
@@ -252,7 +341,7 @@ class BackupDir(BackupMeta):
         """
         return self._compress
     
-    def backup(self) -> bool:
+    def backup(self) -> bool:        
         if self._compress:
             return self._save_compressed()
         
@@ -268,11 +357,12 @@ class BackupDir(BackupMeta):
                         destiny.parent.mkdir(parents= True)
                     
                     BackupFile(Path(path).joinpath(file), destiny).backup()
+            
+            self._last_backup = dt.datetime.now()
+            return True
         except BaseException as exc:
             logging.exception(exc)
-            return False
-        
-        return True
+            return False 
     
     def restore(self) -> bool:
         if self._destiny.is_dir():
@@ -338,7 +428,7 @@ class BackupDir(BackupMeta):
     
     def __getstate__(self):
         state = super().__getstate__()
-        state['compress'] = self._compress
+        state['for_init']['compress'] = self._compress
         return state
 
     def __eq__(self, value) -> bool:
