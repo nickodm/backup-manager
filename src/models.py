@@ -20,6 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from pathlib import Path
 from zipfile import ZipFile
+from threading import Thread
 from abc import ABC, abstractmethod
 import os, logging, sys, pickle, json
 import typing as typ, datetime as dt
@@ -181,6 +182,13 @@ class BackupMeta(ABC):
         Restore the resource.
         """
         pass
+
+    @abstractmethod
+    def is_different(self) -> bool:
+        """
+        Check if the origin and destiny resources are different.
+        """
+        pass
     
     def report(self, index:int = ...) -> str:
         """
@@ -266,6 +274,14 @@ class BackupFile(BackupMeta):
     def resource_size(self) -> int:
         return self._origin.stat(follow_symlinks= True).st_size
     
+    def is_different(self) -> bool:
+        with self._origin.open("rb") as ofp, self._destiny.open("rb") as dfp:
+            for o_line, d_line in zip(ofp.readlines(), dfp.readlines()):
+                if o_line != d_line:
+                    return False
+                
+        return True
+    
     def backup(self) -> bool:
         if not self._origin.exists():
             logging.warning("Tried to backup a resource that doesn't exits.")
@@ -341,12 +357,26 @@ class BackupDir(BackupMeta):
         """
         return self._compress
     
+    def is_different(self) -> bool:
+        return NotImplemented
+        # all_threads:list[Thread] = []
+        
+        # thread_count = round(self.file_count / 8) or 1
+
+        # def wrap(start:int):
+        #     for path, _, files in os.walk(self._origin):
+        #         for file in files:
+                    
+
+        # for _ in range(thread_count):
+        #     all_threads.append(Thread(target= thread_count))
+    
     def backup(self) -> bool:        
         if self._compress:
             return self._save_compressed()
         
-        path_limit = 0
         try:
+            path_limit = 0
             for path, _, files in os.walk(self._origin):
                 if path_limit == 0:
                     path_limit = len(Path(path).parts)
