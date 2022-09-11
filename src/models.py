@@ -112,6 +112,18 @@ def format_delta(time:dt.timedelta, *, since_max:bool = True, levels:int = 1) ->
     
     return ", ".join(buffer[:-1]) + " and " + buffer[-1]
 
+def format_number(number:int) -> str:
+    """
+    Format a number to include dots separating units. For example, convert `1049182` to `1.049.182`.
+    """
+    buffer:list[str] = []
+    for count, num in enumerate(str(number)[::-1]):
+        if count % 3 == 0 and count != 0:
+            buffer.append(".")
+        buffer.append(num)
+
+    return "".join(buffer[::-1])
+
 class BackupMeta(ABC):
     def __init__(self, origin_path:Path, destiny_path:Path) -> None:
         self._origin = origin_path
@@ -123,6 +135,7 @@ class BackupMeta(ABC):
         self = object.__new__(cls)
         self._origin = dictt['origin_path']
         self._destiny = dictt['destiny_path']
+        self._last_backup = dictt['last']
         
         return self
         
@@ -198,7 +211,7 @@ class BackupMeta(ABC):
         underlines = 72
         
         if index != Ellipsis:
-            index_str = f"[{index}] "
+            index_str = f"[{format_number(index)}] "
             report += index_str
             underlines -= len(index_str)
         
@@ -410,7 +423,7 @@ class BackupDir(BackupMeta):
 
     def report(self, index: int = ...) -> str:
         report:list[str] = super().report(index).splitlines()
-        report.insert(-1, f"FILES\t: {self.file_count}")
+        report.insert(-1, f"FILES\t: {format_number(self.file_count)}")
         report.insert(-1, f"COMPRESS: {'Yes' if self._compress else 'No'}")
         
         return "\n".join(report)
@@ -635,7 +648,7 @@ class ResourcesArray(typ.Sequence[BackupMeta]):
             if self._data.index(file) < len(self._data) - 1:
                 report += "\n"
                 
-        report += f"\n\nTOTAL FILES: {self.total_files}\n"
+        report += f"\n\nTOTAL FILES: {format_number(self.total_files)}\n"
         report += f"TOTAL SIZE:  {format_size(self.total_size)}"
         
         return report
@@ -741,11 +754,11 @@ class AllLists():
         string = ""
 
         for index, array in enumerate(self._data):
-            string += "[%i] - \"%s\""%(index, array.name[:32])
+            string += "[%s] - \"%s\""%(format_number(index), array.name[:32])
             if len(array.name) >= 32:
                 string += "...,"
                 
-            string += " | %i elements"%len(array)
+            string += " | %s elements"%format_number(len(array))
             
             if index + 1 < len(self._data):
                 string += "\n"
