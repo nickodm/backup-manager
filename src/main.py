@@ -199,7 +199,7 @@ def main():
         
         case "backup":
             check_selected()
-            print(f"Creating backups of {len(all_lists.selected)} files...")
+            print(f"Creating backups of {all_lists.selected.total_files} files...")
             for file_name, result, _ in all_lists.selected.backup_all():
                 if result:
                     print(f"\"{file_name}\" was successfully copied.")
@@ -210,7 +210,7 @@ def main():
                     
         case "restore":
             check_selected()
-            print(f"Restoring {len(all_lists.selected)} files...")
+            print(f"Restoring {all_lists.selected.total_files} files...")
             for file_name, result, _ in all_lists.selected.restore_all():
                 if result:
                     print(f"\"{file_name}\" was successfully copied.")
@@ -347,6 +347,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
         case "version"|"ver":
             print(f"Nicko's Backup Manager - v{__version__}")
+            
+        case "diff": #TODO: DELETE THIS
+            print(all_lists.selected[check_index(enter[1])].is_different())
         
         case "":
             pass

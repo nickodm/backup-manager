@@ -275,6 +275,9 @@ class BackupFile(BackupMeta):
         return self._origin.stat(follow_symlinks= True).st_size
     
     def is_different(self) -> bool:
+        if not (self._origin.exists() and self._destiny.exists()):
+            return False
+        
         with self._origin.open("rb") as ofp, self._destiny.open("rb") as dfp:
             for o_line, d_line in zip(ofp.readlines(), dfp.readlines()):
                 if o_line != d_line:
@@ -287,19 +290,23 @@ class BackupFile(BackupMeta):
             logging.warning("Tried to backup a resource that doesn't exits.")
             return False
         
-        if self._origin.stat().st_mtime != self._destiny.stat().st_mtime:
-            logging.info(f"{self.name!r} has not been changed.")
-            return False
+        # if self._destiny.exists(): #TODO: Program a better way to use the last modify time to know whether the file has changed
+        #     if self._origin.stat().st_mtime == self._destiny.stat().st_mtime:
+        #         logging.info(f"{self.name!r} has not been changed.")
+        #         return False
         
         try:
+            self._destiny.parent.mkdir(parents= True, exist_ok= True)
             with self._origin.open("rb") as file, self._destiny.open("wb") as backup:
                 for line in file.readlines():
                     backup.write(line)
 
             self._last_backup = dt.datetime.now()
+            logging.info(f"{self.name!r} was successfully backuped.")
             return True
         except BaseException as exc:
             logging.exception(exc)
+            logging.info(f"{self.name!r} wasn't backuped.")
             return False
         
     def restore(self) -> bool:
@@ -357,17 +364,16 @@ class BackupDir(BackupMeta):
         """
         return self._compress
     
-    def is_different(self) -> bool:
-        return NotImplemented
+    def is_different(self) -> bool: #TODO: Implement threading to optimize the speed of this
         # all_threads:list[Thread] = []
         
         # thread_count = round(self.file_count / 8) or 1
 
-        # def wrap(start:int):
-        #     for path, _, files in os.walk(self._origin):
-        #         for file in files:
-                    
-
+        for file in self._walk():
+            if not file.is_different():
+                return False
+        
+        return True
         # for _ in range(thread_count):
         #     all_threads.append(Thread(target= thread_count))
     
@@ -405,7 +411,7 @@ class BackupDir(BackupMeta):
     def report(self, index: int = ...) -> str:
         report:list[str] = super().report(index).splitlines()
         report.insert(-1, f"FILES\t: {self.file_count}")
-        report.insert(-1, f"COMPRESS: {self.compress}")
+        report.insert(-1, f"COMPRESS: {'Yes' if self._compress else 'No'}")
         
         return "\n".join(report)
 
@@ -439,7 +445,7 @@ class BackupDir(BackupMeta):
             logging.exception(exc)
             return False
     
-    def _walk(self, target:typ.Literal['o', 'd'] = 'o') -> typ.Generator[BackupFile, None, None]:
+    def _walk(self, target:typ.Literal['o', 'd'] = 'o', start:int = 0) -> typ.Generator[BackupFile, None, None]:
         """
         Walk over the directory.
         """
