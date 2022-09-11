@@ -376,17 +376,8 @@ class BackupDir(BackupMeta):
             return self._save_compressed()
         
         try:
-            path_limit = 0
-            for path, _, files in os.walk(self._origin):
-                if path_limit == 0:
-                    path_limit = len(Path(path).parts)
-                
-                for file in files:
-                    destiny:Path = self._destiny / "/".join(Path(path).parts[path_limit:]) / file
-                    if not destiny.parent.exists():
-                        destiny.parent.mkdir(parents= True)
-                    
-                    BackupFile(Path(path).joinpath(file), destiny).backup()
+            for file in self._walk():        
+                file.backup()
             
             self._last_backup = dt.datetime.now()
             return True
@@ -395,38 +386,30 @@ class BackupDir(BackupMeta):
             return False 
     
     def restore(self) -> bool:
-        if self._destiny.is_dir():
-            path_limit = 0
-            try:
-                for path, _, files in os.walk(self._destiny):
-                    if path_limit == 0:
-                        path_limit = len(Path(path).parts)
-                    
-                    for file in files:
-                        origin:Path = self._origin / "/".join(Path(path).parts[path_limit:]) / file
-                        if not origin.parent.exists():
-                            origin.parent.mkdir(parents= True)
-                        
-                        BackupFile(origin, Path(path).joinpath(file)).restore()
+        try:
+            if self._destiny.is_dir():
+                for file in self._walk('d'):
+                    file.origin.parent.mkdir(parents= True, exist_ok= True)
+                    file.restore()
                 
                 return True
-            except BaseException as exc:
-                logging.exception(exc)
-                return False
-        else:
-            with ZipFile(self._destiny, "r") as zip_fp:
-                zip_fp.extractall(self._origin)
+            else:
+                with ZipFile(self._destiny, "r") as zip_fp:
+                    zip_fp.extractall(self._origin)
             
-            return True
+                return True
+        except BaseException as exc:
+            logging.exception(exc)
+            return False
 
     def report(self, index: int = ...) -> str:
-        report = super().report(index).splitlines()
+        report:list[str] = super().report(index).splitlines()
         report.insert(-1, f"FILES\t: {self.file_count}")
         report.insert(-1, f"COMPRESS: {self.compress}")
         
         return "\n".join(report)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, typ.Any]:
         dictt:dict = super().to_dict()
         dictt['compress'] = self._compress
         return dictt
@@ -448,14 +431,37 @@ class BackupDir(BackupMeta):
                         path_limit = len(Path(path).parts)
                     
                     for file in files:
-                        with Path(path).joinpath(file) as read_path:
-                                zip_stream.write(read_path, arcname= Path("/".join(read_path.parts[path_limit:])))
+                        read_path = Path(path) / file
+                        zip_stream.write(read_path, arcname= Path("/".join(read_path.parts[path_limit:])))
+
+            return True 
         except BaseException as exc:
             logging.exception(exc)
             return False
-        
-        return True
     
+    def _walk(self, target:typ.Literal['o', 'd'] = 'o') -> typ.Generator[BackupFile, None, None]:
+        """
+        Walk over the directory.
+        """
+        assert target in ('o', 'd')
+        
+        if target == "o":
+            x, y = self._origin, self._destiny
+        else:
+            x, y = self._destiny, self._origin
+        
+        path_limit = 0
+        for path, _, files in os.walk(x):
+            if path_limit == 0:
+                path_limit = len(Path(path).parts)
+            
+            for file in files:
+                z:Path = y / "/".join(Path(path).parts[path_limit:]) / file
+                if target == "o":
+                    yield BackupFile(Path(path) / file, z)
+                else:
+                    yield BackupFile(z, Path(path) / file)
+
     def __getstate__(self):
         state = super().__getstate__()
         state['for_init']['compress'] = self._compress
