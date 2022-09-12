@@ -23,7 +23,7 @@ from zipfile import ZipFile
 from concurrent.futures import ThreadPoolExecutor
 from abc import ABC, abstractmethod
 import os, logging, sys, pickle, json
-import typing as typ, datetime as dt
+import typing as typ, datetime as dt, shutil as sh
 
 __all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR", "ResourcesArray", "AllLists", "NextRoundAdvice"]
 
@@ -303,17 +303,14 @@ class BackupFile(BackupMeta):
             logging.warning("Tried to backup a resource that doesn't exits.")
             return False
         
-        # if self._destiny.exists(): #TODO: Program a better way to use the last modify time to know whether the file has changed
-        #     if self._origin.stat().st_mtime == self._destiny.stat().st_mtime:
-        #         logging.info(f"{self.name!r} has not been changed.")
-        #         return False
+        if self._destiny.exists():
+            if self._origin.stat().st_mtime == self._destiny.stat().st_mtime:
+                logging.info(f"{self.name!r} has not been changed.")
+                return False
         
         try:
             self._destiny.parent.mkdir(parents= True, exist_ok= True)
-            with self._origin.open("rb") as file, self._destiny.open("wb") as backup:
-                for line in file.readlines():
-                    backup.write(line)
-
+            sh.copy2(self._origin, self._destiny)
             self._last_backup = dt.datetime.now()
             logging.info(f"{self.name!r} was successfully backuped.")
             return True
@@ -328,10 +325,8 @@ class BackupFile(BackupMeta):
             return False
 
         try:
-            with self._destiny.open("rb") as file, self._origin.open("wb") as restore:
-                for line in file.readlines():
-                    restore.write(line)
-            
+            self._origin.parent.mkdir(parents= True, exist_ok= True)
+            sh.copy2(self._destiny, self._origin)
             logging.info(f"{self._destiny.name!r} was successfully restored.")
             return True
         except BaseException as exc:
@@ -450,7 +445,7 @@ class BackupDir(BackupMeta):
             logging.exception(exc)
             return False
     
-    def _walk(self, target:typ.Literal['o', 'd'] = 'o', start:int = 0) -> typ.Generator[BackupFile, None, None]:
+    def _walk(self, target:typ.Literal['o', 'd'] = 'o') -> typ.Generator[BackupFile, None, None]:
         """
         Walk over the directory.
         """
