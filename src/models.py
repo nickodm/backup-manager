@@ -20,7 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from pathlib import Path
 from zipfile import ZipFile
-from threading import Thread
+from concurrent.futures import ThreadPoolExecutor
 from abc import ABC, abstractmethod
 import os, logging, sys, pickle, json
 import typing as typ, datetime as dt
@@ -377,18 +377,10 @@ class BackupDir(BackupMeta):
         """
         return self._compress
     
-    def is_different(self) -> bool: #TODO: Implement threading to optimize the speed of this
-        # all_threads:list[Thread] = []
-        
-        # thread_count = round(self.file_count / 8) or 1
-
-        for file in self._walk():
-            if not file.is_different():
-                return False
-        
-        return True
-        # for _ in range(thread_count):
-        #     all_threads.append(Thread(target= thread_count))
+    def is_different(self) -> bool:
+        with ThreadPoolExecutor() as pool:
+            result = pool.map(lambda file: file.is_different(), self._walk())
+        return any(result)        
     
     def backup(self) -> bool:        
         if self._compress:

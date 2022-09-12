@@ -347,9 +347,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
         case "version"|"ver":
             print(f"Nicko's Backup Manager - v{__version__}")
-            
-        case "diff": #TODO: DELETE THIS
-            print(all_lists.selected[check_index(enter[1])].is_different())
         
         case "":
             pass
