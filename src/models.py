@@ -25,7 +25,7 @@ from abc import ABC, abstractmethod
 import os, logging, sys, pickle, json
 import typing as typ, datetime as dt, shutil as sh
 
-__all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR", "ResourcesArray", "AllLists", "NextRoundAdvice"]
+__all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR", "ResourcesArray", "AllLists", "NextRoundAdvice", "all_lists"]
 
 PROJECT_DIR:Path = Path(os.getenv("APPDATA") + "/Nicko's Backup Manager") if sys.platform == "win32" else Path.home() / ".Nicko's Backup Manager"
 
@@ -679,7 +679,7 @@ class AllLists():
         self._selected = None
         
     @property
-    def selected(self) -> ResourcesArray:
+    def selected(self) -> ResourcesArray|None:
         """
         The list that is selected.
         """
@@ -782,6 +782,7 @@ class AllLists():
 
         return False
     
+all_lists = AllLists()    
 
 #* ----------------------
 #*      EXCEPTIONS

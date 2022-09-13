@@ -25,8 +25,6 @@ import tkinter.filedialog as tkFd
 
 __version__ = "0.2.0"
 
-all_lists = AllLists()
-
 def exit():
     all_lists.save()
     sys_exit()
