@@ -41,7 +41,7 @@ class BackupMeta(ABC):
         self = object.__new__(cls)
         self._origin = dictt['origin_path']
         self._destiny = dictt['destiny_path']
-        self._last_backup = dictt['last']
+        self._last_backup = dictt.get('last', None)
         
         return self
         
@@ -71,7 +71,8 @@ class BackupMeta(ABC):
         """
         Whether the path is a dir or a file. Another way to know this is `isinstance(x, BackupFile/BackupDir)`
         """
-        return "dir" if self._origin.is_dir() else "file"
+        from re import fullmatch
+        return fullmatch("Backup(\w+)", type(self).__name__).group(1)
 
     @property
     def last_backup(self) -> dt.datetime|None:
@@ -103,7 +104,7 @@ class BackupMeta(ABC):
         pass
 
     @abstractmethod
-    def is_different(self) -> bool:
+    def are_different(self) -> bool:
         """
         Check if the origin and destiny resources are different.
         """
@@ -166,7 +167,8 @@ class BackupMeta(ABC):
         else: # Support for old versions
             if "origin_path" in state.keys() and "destiny_path" in state.keys():
                 self.__init__(**state)
-        
+            self._last_backup = state.get('last', None)
+            
     def __enter__(self):
         return self
     
@@ -193,26 +195,29 @@ class BackupFile(BackupMeta):
     def resource_size(self) -> int:
         return self._origin.stat(follow_symlinks= True).st_size
     
-    def is_different(self) -> bool: #TODO: Add the last modify time.
+    def are_different(self, strict:bool = False) -> bool:
         if not (self._origin.exists() and self._destiny.exists()):
+            return True
+        
+        if self._origin.stat().st_mtime == self._destiny.stat().st_mtime:
             return False
         
-        with self._origin.open("rb") as ofp, self._destiny.open("rb") as dfp:
-            for o_line, d_line in zip(ofp.readlines(), dfp.readlines()):
-                if o_line != d_line:
-                    return False
+        if strict:
+            with self._origin.open("rb") as ofp, self._destiny.open("rb") as dfp:
+                for o_line, d_line in zip(ofp.readlines(), dfp.readlines()):
+                    if o_line != d_line:
+                        return True
                 
-        return True
+        return False
     
     def backup(self) -> bool:
         if not self._origin.exists():
             logging.warning("Tried to backup a resource that doesn't exits.")
             return False
         
-        if self._destiny.exists():
-            if self._origin.stat().st_mtime == self._destiny.stat().st_mtime:
-                logging.info(f"{self.name!r} has not been changed.")
-                return False
+        if not self.are_different():
+            logging.info(f"{self.name!r} has not been changed.")
+            return False
         
         try:
             self._destiny.parent.mkdir(parents= True, exist_ok= True)
@@ -278,12 +283,15 @@ class BackupDir(BackupMeta):
         """
         return self._compress
     
-    def is_different(self) -> bool:
+    def are_different(self, strict:bool = False) -> bool:
         with ThreadPoolExecutor() as pool:
-            result = pool.map(lambda file: file.is_different(), self._walk())
-        return any(result)        
+            return any(pool.map(lambda file: file.is_different(strict= strict), self._walk()))
     
-    def backup(self) -> bool:        
+    def backup(self) -> bool:
+        if not self.are_different():
+            logging.info(f"{self.name!r} has not been changed.")
+            return False
+        
         if self._compress:
             return self._save_compressed()
         

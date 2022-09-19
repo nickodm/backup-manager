@@ -171,9 +171,9 @@ def main():
                     print(f"\"{meta.name}\" was successfully copied.")
                     logging.info(f"\"{meta.name}\" was successfully copied.")
                 else:
-                    if not meta.is_different():
-                        print(f'"{meta.name}" has not changes. It was not copied.')
-                        logging.info(f'"{meta.name}" has not changes. It was not copied.')
+                    if not meta.are_different():
+                        print(f'"{meta.name}" has no changes. It was not copied.')
+                        logging.info(f'"{meta.name}" has no changes. It was not copied.')
                     else:
                         print(f"\"{meta.name}\" cannot be copied.")
                         logging.info(f"\"{meta.name}\" cannot be copied.")
