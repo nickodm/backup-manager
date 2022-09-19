@@ -48,51 +48,65 @@ def check_selected() -> None:
         print("First, you must select a list.")
         raise NextRoundAdvice()
 
-def get_file_destiny(origin_path:Path):
-    path = tkFd.asksaveasfilename(
-        title= "Backup File Destiny",
-        initialfile= "[BACKUP] " + origin_path.name,
-        defaultextension= origin_path.suffix,
-        filetypes= (("*" + origin_path.suffix, origin_path.suffix), 
-        )
-    )
-
-    return Path(path)
-    
-def get_file_origin():
-    path = tkFd.askopenfilename(
+def get_file() -> tuple[Path, Path]:
+    origin = tkFd.askopenfilename(
         title= "Backup File",
         filetypes= (
-            ("Cualquier Archivo", "*.*"), 
+            ("Any File", "*.*"), 
         )
     )
+    
+    if not origin:
+        print("The file was not added.")
+        raise NextRoundAdvice()
+    origin = Path(origin).resolve(strict= True)
 
-    return Path(path)
+    destiny = Path(tkFd.asksaveasfilename(
+        title= "Backup File Destiny",
+        initialfile= "[BACKUP] " + origin.name,
+        defaultextension= origin.suffix,
+        filetypes= (("*" + origin.suffix, origin.suffix), 
+        )
+    ))
+    
+    if not destiny:
+        print("The file was not added.")
+        raise NextRoundAdvice()    
+    destiny = Path(destiny).resolve()
 
-def get_dir_origin():
-    path = tkFd.askdirectory(
+    return (origin, destiny)
+
+def get_dir(*, zip_file:bool = False) -> tuple[Path, Path]:
+    origin = tkFd.askdirectory(
         title= "Backup Dir",
         mustexist= True
     )
     
-    return Path(path)
-
-def get_dir_destiny(*, zip_file:bool = False, file_name:str = ""):
+    if not origin:
+        print("The dir was not added.")
+        raise NextRoundAdvice()
+    origin = Path(origin).resolve(strict= True)
+    
     if zip_file:
-        path = tkFd.asksaveasfilename(
+        destiny = tkFd.asksaveasfilename(
             title= "Backup Dir Destiny",
             filetypes= (("Archivo ZIP", "*.zip"), ),
             defaultextension= "*.zip",
-            initialfile= " [BACKUP] " + file_name
+            initialfile= " [BACKUP] " + origin.name
         )
     else:
-        path = tkFd.askdirectory(
+        destiny = tkFd.askdirectory(
                 title= "Backup Dir Destiny",
                 mustexist= False,
-                initialdir= " [BACKUP] " + file_name
+                initialdir= " [BACKUP] " + origin.name
             )
         
-    return Path(path)
+    if not destiny:
+        print("The dir was not added.")
+        raise NextRoundAdvice()    
+    destiny = Path(destiny).resolve()
+
+    return (origin, destiny)
 
 def main():
     enter = ctools.prompt(f"[{all_lists.selected_index}] >> ")
@@ -107,17 +121,7 @@ def main():
             check_selected()
             match enter[1]:
                 case "file":
-                    origin = get_file_origin()
-                    if origin == Path():
-                        print("The file was not added.")
-                        return
-                    
-                    destiny = get_file_destiny(origin)
-                    if destiny == Path():
-                        print("The file was not added.")
-                        return
-                    
-                    new_file = BackupFile(origin, destiny)
+                    new_file = BackupFile(*get_file())
                     
                     all_lists.selected.add(new_file)
                     print(f"The file \"{new_file.origin.name}\" was added to the list.")
@@ -126,17 +130,7 @@ def main():
                 case "dir":
                     compress = enter[2] in ("--compress", "-c")
                     
-                    origin = get_dir_origin()
-                    if origin == Path():
-                        print("The dir was not added.")
-                        return
-                    
-                    destiny = get_dir_destiny(zip_file= compress, file_name= origin.name)
-                    if destiny == Path():
-                        print("The dir was not added.")
-                        return
-                    
-                    new_dir = BackupDir(origin, destiny, compress= compress)
+                    new_dir = BackupDir(*get_dir(zip_file= compress), compress= compress)
                     
                     all_lists.selected.add(new_dir)
                     print(f"The dir \"{new_dir.origin.name}\" was added to the list.")
