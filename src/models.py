@@ -193,7 +193,7 @@ class BackupFile(BackupMeta):
     def resource_size(self) -> int:
         return self._origin.stat(follow_symlinks= True).st_size
     
-    def is_different(self) -> bool:
+    def is_different(self) -> bool: #TODO: Add the last modify time.
         if not (self._origin.exists() and self._destiny.exists()):
             return False
         
@@ -459,13 +459,20 @@ class ResourcesArray(typ.Sequence[BackupMeta]):
         for i in iter:
             self.add(i)
     
-    def backup_all(self) -> typ.Generator[tuple[str, bool, BackupMeta], None, None]:
+    def backup(self, index:int|slice = ...) -> typ.Generator[tuple[bool, BackupMeta], None, None]:
         """
         Backup all the paths in the array.
         """
-        logging.info(f"Starting backups of {self.name!r} ({len(self._data)} items)...")
-        for meta in self._data:
-            yield (meta.name, meta.backup(), meta)
+        if isinstance(index, int):
+            index = slice(index, index + 1)
+        elif index == Ellipsis:
+            index = slice(0, None)
+        
+        data = self._data[index]
+        
+        logging.info(f"Starting backups of {self.name!r} ({len(data)} items)...")
+        for meta in data:
+            yield (meta.backup(), meta)
         logging.info(f"The backup of {self.name!r} has ended.")
         
     def restore_all(self):
@@ -617,7 +624,7 @@ class AllLists():
     
     def add(self, value:ResourcesArray):
         assert isinstance(value, ResourcesArray)   
-        self._data.append(self.__check_repeteance(value))
+        self._data.append(self.__check_repetition(value))
     
     def get(self, index:int, default:ResourcesArray = ...) -> ResourcesArray:
         try:
@@ -665,7 +672,7 @@ class AllLists():
         self._selected = self._data[index]
         return self._selected
     
-    def __check_repeteance(self, value:ResourcesArray):
+    def __check_repetition(self, value:ResourcesArray):
         if value.name in map(lambda x: x.name, self._data):
             raise RepeteanceError(
                 "The list is repeated."

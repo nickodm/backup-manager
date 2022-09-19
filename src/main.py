@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from pathlib import Path
 import logging
 from ctypes import windll
+from typing import Literal as _Literal
 from models import *
 import tkinter.filedialog as tkFd
 import consoletools as ctools
@@ -30,16 +31,27 @@ def exit():
     all_lists.save()
     sys_exit()
     
-def check_index(num:str) -> int:
+def check_index(num:str, allow_slice:bool = True, iter:_Literal['a', 's'] = 'a') -> int|slice:
+    assert iter in ('a', 's')
+    iter_ = all_lists if iter == 'a' else all_lists.selected
+
+    if allow_slice and ctools.is_slice(num):
+        index = ctools.convert_slice(num)
+        if index.start < 0 or index.stop > len(iter_):
+            print("The index is out of range.")
+            raise NextRoundAdvice()
+            
+        return index
+    
     if not num.isdigit():
         print("You must input a real index.")
-        raise NextRoundAdvice
+        raise NextRoundAdvice()
     
     index = int(num)
     
-    if all_lists.get(index, None) == None:
+    if index >= len(iter_):
         print("The index is out of range.")
-        raise NextRoundAdvice
+        raise NextRoundAdvice()
         
     return index
 
@@ -152,14 +164,19 @@ def main():
         
         case "backup":
             check_selected()
-            print(f"Creating backups of {all_lists.selected.total_files} files...")
-            for file_name, result, _ in all_lists.selected.backup_all():
+            index = check_index(enter[1], iter= 's') if enter[1] else ...
+            print(f"Creating backups...")
+            for result, meta in all_lists.selected.backup(index):
                 if result:
-                    print(f"\"{file_name}\" was successfully copied.")
-                    logging.info(f"\"{file_name}\" was successfully copied.")
+                    print(f"\"{meta.name}\" was successfully copied.")
+                    logging.info(f"\"{meta.name}\" was successfully copied.")
                 else:
-                    print(f"\"{file_name}\" cannot be copied.")
-                    logging.info(f"\"{file_name}\" cannot be copied.")
+                    if not meta.is_different():
+                        print(f'"{meta.name}" has not changes. It was not copied.')
+                        logging.info(f'"{meta.name}" has not changes. It was not copied.')
+                    else:
+                        print(f"\"{meta.name}\" cannot be copied.")
+                        logging.info(f"\"{meta.name}\" cannot be copied.")
                     
         case "restore":
             check_selected()
