@@ -20,42 +20,16 @@ from pathlib import Path
 import logging
 from ctypes import windll
 from models import *
-from sys import exit as sys_exit
 import tkinter.filedialog as tkFd
+import consoletools as ctools
 
 __version__ = "0.2.0"
 
 def exit():
+    from sys import exit as sys_exit
     all_lists.save()
     sys_exit()
     
-def clear_terminal():
-    from os import system
-    from sys import platform
-    system("cls" if platform == "win32" else "clear")
-    
-def prompt(prompt:str = "", *, extension:int = 12):
-    try:
-        enter = input(prompt)
-    except (KeyboardInterrupt, EOFError) as exc:
-        if isinstance(exc, KeyboardInterrupt):
-            print("^C")
-        
-        print("Saving list...")
-        print("Exiting...")
-        exit()
-
-    if enter.isspace() or enter == "":
-        enter = [""]
-    else:
-        enter = enter.split()
-    
-    # Fill the list with empty strings
-    for _ in range(extension - len(enter)):
-        enter.append("")
-
-    return enter
-
 def check_index(num:str) -> int:
     if not num.isdigit():
         print("You must input a real index.")
@@ -121,7 +95,7 @@ def get_dir_destiny(*, zip_file:bool = False, file_name:str = ""):
     return Path(path)
 
 def main():
-    enter = prompt(f"[{all_lists.selected_index}] >> ")
+    enter = ctools.prompt(f"[{all_lists.selected_index}] >> ")
     
     match enter[0]:
         case "exit":
@@ -150,7 +124,7 @@ def main():
                     logging.info(f"The file \"{new_file.origin.name}\" was added to the list.")
                     
                 case "dir":
-                    compress = enter[2].lower() in ("--compress", "-c")
+                    compress = enter[2] in ("--compress", "-c")
                     
                     origin = get_dir_origin()
                     if origin == Path():
@@ -173,21 +147,8 @@ def main():
         
         case "del":
             check_selected()
-            if enter[1] == "":
-                print("You must input a number next to the word 'del'.")
-                return
-            elif not enter[1].isdigit():
-                print("You must input a real number.")
-                return
-            
-            enter[1] = int(enter[1])
-
-            if len(all_lists.selected) <= enter[1] or enter[1] < 0:
-                print(f"The index must be between 0 and {len(all_lists.selected) - 1}.")
-                return
-            
-            deleted = all_lists.selected.pop(enter[1])
-
+            index = check_index(enter[1])
+            deleted = all_lists.selected.pop(index)
             print(f"The {deleted.type} \"{deleted.name}\" was deleted from the list.")
             logging.info(f"The {deleted.type} \"{deleted.name}\" was deleted from the list.")
         
@@ -220,7 +181,7 @@ def main():
         case "list":
             match enter[1]:
                 case "show":
-                    if enter[2] == "":
+                    if not enter.get(2, None):
                         print(all_lists.mention())
                         return
                     
@@ -234,11 +195,14 @@ def main():
                     print("The \"%s\" list was selected."%all_lists.select(index).name)
                     
                 case "create":
-                    name = " ".join(prompt("Enter a name for the list: "))
-                    name = name.strip()
+                    name = enter.get(2, "")
 
                     if name in ("exit", "cancel"):
                         print("The list was not created.")
+                        return
+                    
+                    if name == "":
+                        print("Please, choose a name for the list.")
                         return
                     
                     all_lists.add(ResourcesArray(name))
@@ -262,15 +226,10 @@ def main():
                         return
 
                     if not ("-d" in enter or "--direct" in enter):
-                        print(f"Is \"{importing.name}\" the list?")
-                        while True:
-                            match prompt("[y|n] Confirm>> ")[0].lower():
-                                case "y":
-                                    break
-                                
-                                case "n":
-                                    print("The list was not imported.")
-                                    return
+                        print(f"Is \"{importing.name}\" the list?", end= " ")
+                        if not ctools.confirm(cancel= True):
+                            print("The list was not imported.")
+                            return
                                 
                     all_lists.add(importing)
                     print(f"The list \"{importing.name}\" was imported.")
@@ -295,28 +254,29 @@ def main():
                 case "remove":
                     index = check_index(enter[2])
 
-                    print(f"The \"{all_lists.pop(index).name}\" list was removed.")
+                    print(f"The list \"{all_lists.pop(index).name}\" was removed.")
                     
                 case "rename":
                     index = check_index(enter[2])
                     
-                    print(f"Input a new name to \"{all_lists[index].name}\".")
-                    new_name = " ".join(prompt(">> ")).strip()
+                    new_name = enter.get(3, "")
+                    
+                    if new_name == "":
+                        print("Please, input a name.")
+                        return
                     
                     if new_name in map(lambda x: x.name, all_lists):
                         print(f"There is already a list named \"{new_name}\".")
                         return
                     
-                    while True:
-                        match prompt("[y|n] Confirm>> ")[0].lower():
-                            case "y":
-                                all_lists[index].name = new_name
-                                print("The list was renamed.")
-                                return
-                            
-                            case "n":
-                                print("The list was not renamed.")
-                                return
+                    print(f'The list "{all_lists[index].name}" will be renamed to "{new_name}".')
+                    print("Are you sure?", end= " ")
+                    if ctools.confirm(cancel= True):
+                        all_lists[index].name = new_name
+                        print("The list was renamed.")
+                    else: 
+                        print("The list was not renamed.")
+                    return
                 
                 case _:
                     print("Unknown command")
@@ -341,7 +301,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """)
         case "cls"|"clear":
-            clear_terminal()
+            ctools.shell.clear()
 
         case "version"|"ver":
             print(f"Nicko's Backup Manager - v{__version__}")
