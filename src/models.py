@@ -39,9 +39,12 @@ class BackupMeta(ABC):
     @classmethod
     def from_dict(cls, dictt:dict):
         self = object.__new__(cls)
-        self._origin = dictt['origin_path']
-        self._destiny = dictt['destiny_path']
-        self._last_backup = dictt.get('last', None)
+        self._origin = Path(dictt['origin_path'])
+        self._destiny = Path(dictt['destiny_path'])
+        if dictt.get('last', None):
+            self._last_backup = dt.datetime.fromtimestamp(dictt['last'])
+        else:
+            self._last_backup = None
         
         return self
         
@@ -72,7 +75,7 @@ class BackupMeta(ABC):
         Whether the path is a dir or a file. Another way to know this is `isinstance(x, BackupFile/BackupDir)`
         """
         from re import fullmatch
-        return fullmatch("Backup(\w+)", type(self).__name__).group(1)
+        return fullmatch("Backup(\w+)", type(self).__name__).group(1).lower()
 
     @property
     def last_backup(self) -> dt.datetime|None:
@@ -143,10 +146,10 @@ class BackupMeta(ABC):
         Return self represented in a dict.
         """
         return {
-            "origin_path": self._origin,
-            "destiny_path": self._destiny,
+            "origin_path": os.fspath(self._origin),
+            "destiny_path": os.fspath(self._destiny),
             "type": self.type,
-            "last": self._last_backup
+            "last": self._last_backup.timestamp()
         }    
     
     def __getstate__(self):
@@ -604,6 +607,9 @@ class ResourcesArray(typ.Sequence[BackupMeta]):
 
         return False
     
+    def __repr__(self) -> str:
+        return type(self).__name__ + f"(name= {self.name})"
+    
 # Convert PathBackupArrays to ResourcesArrays
 class PathBackupArray(ResourcesArray):
     def __new__(cls):
@@ -629,7 +635,7 @@ class AllLists():
         if self._selected == None:
             return "X"
         
-        return str(self._data.index(self.selected))
+        return str(self._data.index(self._selected))
         
     def load(self):
         if not PROJECT_DIR.joinpath("all_lists").exists():
@@ -646,8 +652,11 @@ class AllLists():
             pickle.dump(self, fp)
     
     def add(self, value:ResourcesArray):
-        assert isinstance(value, ResourcesArray)   
-        self._data.append(self.__check_repetition(value))
+        assert isinstance(value, ResourcesArray)
+        new = self.__check_repetition(value)
+        self._data.append(new)
+        if len(self._data) == 1 and self._selected == None:
+            self._selected = new
     
     def get(self, index:int, default:ResourcesArray = ...) -> ResourcesArray:
         try:
@@ -658,10 +667,14 @@ class AllLists():
             
             raise
     
-    def pop(self, index:int) -> ResourcesArray: 
+    def pop(self, index:int) -> ResourcesArray|None:
+        if self._data[index] is self._selected:
+            self._selected = None
         return self._data.pop(index)
 
     def remove(self, value:ResourcesArray):
+        if value == self._selected:
+            self._selected = None
         return self._data.remove(value)
     
     def index(self, value:ResourcesArray) -> int:
