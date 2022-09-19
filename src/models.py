@@ -90,21 +90,21 @@ class BackupMeta(ABC):
         pass
     
     @abstractmethod
-    def backup(self) -> bool:
+    def backup(self, force:bool = False) -> bool:
         """
         Backup the resource.
         """
         pass
     
     @abstractmethod
-    def restore(self) -> bool:
+    def restore(self, force:bool = False) -> bool:
         """
         Restore the resource.
         """
         pass
 
     @abstractmethod
-    def are_different(self) -> bool:
+    def are_different(self, strict:bool = False) -> bool:
         """
         Check if the origin and destiny resources are different.
         """
@@ -210,12 +210,12 @@ class BackupFile(BackupMeta):
                 
         return False
     
-    def backup(self) -> bool:
+    def backup(self, force:bool = False) -> bool:
         if not self._origin.exists():
             logging.warning("Tried to backup a resource that doesn't exits.")
             return False
         
-        if not self.are_different():
+        if not force and not self.are_different():
             logging.info(f"{self.name!r} has not been changed.")
             return False
         
@@ -230,9 +230,13 @@ class BackupFile(BackupMeta):
             logging.info(f"{self.name!r} wasn't backuped.")
             return False
         
-    def restore(self) -> bool:
+    def restore(self, force:bool = False) -> bool:
         if not self._destiny.exists():
             logging.warning("Tried to restore a backup that doesn't exists.")
+            return False
+        
+        if not force and not self.are_different():
+            logging.info(f"{self.name!r} has not been changed.")
             return False
 
         try:
@@ -285,10 +289,10 @@ class BackupDir(BackupMeta):
     
     def are_different(self, strict:bool = False) -> bool:
         with ThreadPoolExecutor() as pool:
-            return any(pool.map(lambda file: file.is_different(strict= strict), self._walk()))
+            return any(pool.map(lambda file: file.are_different(strict= strict), self._walk()))
     
-    def backup(self) -> bool:
-        if not self.are_different():
+    def backup(self, force:bool = False) -> bool:
+        if not force and not self.are_different():
             logging.info(f"{self.name!r} has not been changed.")
             return False
         
@@ -297,7 +301,7 @@ class BackupDir(BackupMeta):
         
         try:
             for file in self._walk():        
-                file.backup()
+                file.backup(force= force)
             
             self._last_backup = dt.datetime.now()
             return True
@@ -305,7 +309,11 @@ class BackupDir(BackupMeta):
             logging.exception(exc)
             return False 
     
-    def restore(self) -> bool:
+    def restore(self, force:bool = False) -> bool:
+        if not force and not self.are_different():
+            logging.info(f"{self.name!r} has not been changed.")
+            return False
+        
         try:
             if self._destiny.is_dir():
                 for file in self._walk('d'):
@@ -467,9 +475,9 @@ class ResourcesArray(typ.Sequence[BackupMeta]):
         for i in iter:
             self.add(i)
     
-    def backup(self, index:int|slice = ...) -> typ.Generator[tuple[bool, BackupMeta], None, None]:
+    def backup(self, index:int|slice = ..., *, force:bool = False) -> typ.Generator[tuple[bool, BackupMeta], None, None]:
         """
-        Backup all the paths in the array.
+        Backup resources of the array.
         """
         if isinstance(index, int):
             index = slice(index, index + 1)
@@ -478,18 +486,25 @@ class ResourcesArray(typ.Sequence[BackupMeta]):
         
         data = self._data[index]
         
-        logging.info(f"Starting backups of {self.name!r} ({len(data)} items)...")
+        logging.info(f"Starting backups of {self.name!r}...")
         for meta in data:
-            yield (meta.backup(), meta)
+            yield (meta.backup(force= force), meta)
         logging.info(f"The backup of {self.name!r} has ended.")
         
-    def restore_all(self):
+    def restore(self, index:int|slice = ..., *, force:bool = False) -> typ.Generator[tuple[bool, BackupMeta], None, None]:
         """
-        Restore all the paths in the array.
+        Restore resources of the array.
         """
-        logging.info(f"Starting restore of {self.name!r} ({len(self._data)} items)...")
-        for meta in self._data:
-            yield meta.name, meta.restore(), meta
+        if isinstance(index, int):
+            index = slice(index, index + 1)
+        elif index == Ellipsis:
+            index = slice(0, None)
+        
+        data = self._data[index]
+        
+        logging.info(f"Starting restore of {self.name!r}...")
+        for meta in data:
+            yield (meta.restore(force= force), meta)
         logging.info(f"The restoring of {self.name!r} has ended.")
     
     def files_only(self) -> tuple[BackupFile]:

@@ -165,29 +165,32 @@ def main():
         case "backup":
             check_selected()
             index = check_index(enter[1], iter= 's') if enter[1] else ...
-            print(f"Creating backups...")
+            print("Creating backups...")
             for result, meta in all_lists.selected.backup(index):
                 if result:
                     print(f"\"{meta.name}\" was successfully copied.")
                     logging.info(f"\"{meta.name}\" was successfully copied.")
+                elif not meta.are_different():
+                    print(f'"{meta.name}" has no changes. It was not copied.')
+                    logging.info(f'"{meta.name}" has no changes. It was not copied.')
                 else:
-                    if not meta.are_different():
-                        print(f'"{meta.name}" has no changes. It was not copied.')
-                        logging.info(f'"{meta.name}" has no changes. It was not copied.')
-                    else:
-                        print(f"\"{meta.name}\" cannot be copied.")
-                        logging.info(f"\"{meta.name}\" cannot be copied.")
+                    print(f"\"{meta.name}\" cannot be copied.")
+                    logging.info(f"\"{meta.name}\" cannot be copied.")
                     
         case "restore":
             check_selected()
-            print(f"Restoring {all_lists.selected.total_files} files...")
-            for file_name, result, _ in all_lists.selected.restore_all():
+            index = check_index(enter[1], iter= 's') if enter[1] else ...
+            print("Restoring...")
+            for result, meta in all_lists.selected.restore(index):
                 if result:
-                    print(f"\"{file_name}\" was successfully copied.")
-                    logging.info(f"\"{file_name}\" was successfully copied.")
+                    print(f"\"{meta.name}\" was successfully copied.")
+                    logging.info(f"\"{meta.name}\" was successfully copied.")
+                elif not meta.are_different():
+                    print(f'"{meta.name}" has no changes. It was not copied.')
+                    logging.info(f'"{meta.name}" has no changes. It was not copied.')
                 else:
-                    print(f"\"{file_name}\" cannot be copied.")
-                    logging.info(f"\"{file_name}\" cannot be copied.")
+                    print(f"\"{meta.name}\" cannot be copied.")
+                    logging.info(f"\"{meta.name}\" cannot be copied.")
                     
         case "list":
             match enter[1]:
