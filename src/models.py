@@ -22,107 +22,13 @@ from pathlib import Path
 from zipfile import ZipFile
 from concurrent.futures import ThreadPoolExecutor
 from abc import ABC, abstractmethod
+from consoletools import format_delta, format_number, format_size
 import os, logging, sys, pickle, json
 import typing as typ, datetime as dt, shutil as sh
 
 __all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR", "ResourcesArray", "AllLists", "NextRoundAdvice", "all_lists"]
 
 PROJECT_DIR:Path = Path(os.getenv("APPDATA") + "/Nicko's Backup Manager") if sys.platform == "win32" else Path.home() / ".Nicko's Backup Manager"
-
-def format_size(size:int|float) -> str:
-    """
-    Format a size in a string. For example, convert `1024` to `"1KB"`.
-    """
-    size = float(size)
-    
-    units = {
-        0: "B",  # Byte
-        1: "KB", # Kilobyte
-        2: "MB", # Megabyte
-        3: "GB", # Gigabyte
-        4: "TB"  # Terabyte
-    }
-    
-    count = 0
-    while size >= 1024 and count <= 4:
-        size /= 1024
-        count += 1
-        
-    if size.is_integer():
-        return "%i%s"%(size, units.get(count, "TB"))
-        
-    return "%.2f%s"%(size, units.get(count, "TB"))
-
-def format_delta(time:dt.timedelta, *, since_max:bool = True, levels:int = 1) -> str:
-    """
-    Format a `datetime.timedelta` to a string.
-    """
-    assert levels > 0
-    
-    all:dict[str, int] = {
-       "years": 0,
-       "months": 0,
-       "weeks": 0,
-       "days": time.days,
-       "hours": 0,
-       "minutes": 0,
-       "seconds": time.seconds 
-    }
-    
-    while all['seconds'] >= 60:
-        all['minutes'] += 1
-        all['seconds'] -= 60
-        
-    while all['minutes'] >= 60:
-        all['hours'] += 1
-        all['minutes'] -= 60
-
-    while all['hours'] >= 24:
-        all['days'] += 1
-        all['hours'] -= 24
-        
-    while all['days'] >= 7:
-        all['weeks'] += 1
-        all['days'] -= 7
-
-    while all['weeks'] >= 4:
-        all['months'] += 1
-        all['weeks'] -= 4
-
-    while all['months'] >= 12:
-        all['years'] += 1
-        all['months'] -= 12
-        
-    buffer:list[str] = []
-    
-    count = 0    
-    for name, value in all.items():
-        if since_max and value <= 0:
-            continue
-
-        name = name if value != 1 else name[:-1]
-        buffer.append(f"{value} {name}")
-        
-        count += 1
-        if count == levels:
-            break
-    
-    if len(buffer) < 2:
-        return " ".join(buffer)
-    
-    return ", ".join(buffer[:-1]) + " and " + buffer[-1]
-
-def format_number(number:int) -> str:
-    """
-    Format a number to include dots separating units. For example, convert `1049182` to `1.049.182`.
-    """
-    buffer:list[str] = []
-    for count, num in enumerate(str(number)[::-1]):
-        if count % 3 == 0 and count != 0:
-            buffer.append(".")
-        buffer.append(num)
-
-    return "".join(buffer[::-1])
 
 class BackupMeta(ABC):
     def __init__(self, origin_path:Path, destiny_path:Path) -> None:
