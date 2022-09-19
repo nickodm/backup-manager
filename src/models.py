@@ -27,6 +27,7 @@ import os, logging, sys, pickle, json
 import typing as typ, datetime as dt, shutil as sh
 
 __all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR", "ResourcesArray", "AllLists", "NextRoundAdvice", "all_lists"]
+_AT = typ.TypeVar("_AT")
 
 PROJECT_DIR:Path = Path(os.getenv("APPDATA") + "/Nicko's Backup Manager") if sys.platform == "win32" else Path.home() / ".Nicko's Backup Manager"
 
@@ -459,6 +460,19 @@ class ResourcesArray(typ.Sequence[BackupMeta]):
         assert isinstance(value, BackupMeta), "'value' must be an instance of a subclass of BackupMeta."
         self._data.append(value)
         
+    @typ.overload
+    def get(self, index:int) -> BackupMeta: ...
+    @typ.overload
+    def get(self, index:int, default:_AT = ...) -> BackupMeta|_AT: ...
+        
+    def get(self, index:int, default:_AT = ...):
+        try:
+            return self._data[index]
+        except IndexError:
+            if default != Ellipsis:
+                return default
+            raise
+        
     def clear(self) -> None:
         self._data.clear()
         
@@ -510,18 +524,22 @@ class ResourcesArray(typ.Sequence[BackupMeta]):
             yield (meta.restore(force= force), meta)
         logging.info(f"The restoring of {self.name!r} has ended.")
     
-    def files_only(self) -> tuple[BackupFile]:
+    def files_only(self):
         """
         Return a copy of the array with files only.
         """
-        return tuple(filter(lambda x: isinstance(x, BackupFile), self._data))
+        new = ResourcesArray(self.name)
+        new._data = list(filter(lambda x: isinstance(x, BackupFile), self._data))
+        return new
     
-    def dirs_only(self) -> tuple[BackupDir]:
+    def dirs_only(self):
         """
         Return a copy of the array with dirs only.
         """
-        return tuple(filter(lambda x: isinstance(x, BackupDir), self._data))
-    
+        new = ResourcesArray(self.name)
+        new._data = list(filter(lambda x: isinstance(x, BackupDir), self._data))
+        return new
+
     def copy(self):
         """
         Return a copy of the array.
