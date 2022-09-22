@@ -26,7 +26,7 @@ from consoletools import format_delta, format_number, format_size
 import os, logging, sys, pickle, json
 import typing as typ, datetime as dt, shutil as sh
 
-__all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR", "ResourcesArray", "AllLists", "NextRoundAdvice", "all_lists"]
+__all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR", "ResourcesArray", "all_lists"]
 _AT = typ.TypeVar("_AT")
 
 PROJECT_DIR:Path = Path(os.getenv("APPDATA") + "/Nicko's Backup Manager") if sys.platform == "win32" else Path.home() / ".Nicko's Backup Manager"
@@ -42,7 +42,7 @@ class BackupMeta(ABC):
         self = object.__new__(cls)
         self._origin = Path(dictt['origin_path'])
         self._destiny = Path(dictt['destiny_path'])
-        if dictt.get('last', None):
+        if dictt.get('last', None) and dictt['last']:
             self._last_backup = dt.datetime.fromtimestamp(dictt['last'])
         else:
             self._last_backup = None
@@ -150,7 +150,7 @@ class BackupMeta(ABC):
             "origin_path": os.fspath(self._origin),
             "destiny_path": os.fspath(self._destiny),
             "type": self.type,
-            "last": self._last_backup.timestamp()
+            "last": self._last_backup.timestamp() if isinstance(self._last_backup, dt.datetime) else None
         }    
     
     def __getstate__(self):
@@ -482,8 +482,13 @@ class ResourcesArray(typ.Sequence[BackupMeta]):
     def index(self, value:BackupMeta) -> int:
         return self._data.index(value)
     
-    def pop(self, index:BackupMeta) -> BackupMeta:
-        return self._data.pop(index)
+    def pop(self, index:int|slice) -> typ.Generator[BackupMeta, None, None]:
+        if isinstance(index, int):
+            index = slice(index, index + 1)
+            
+        for meta in self._data[index]:
+            self._data.remove(meta)
+            yield meta
     
     def remove(self, value:BackupMeta) -> None:
         self._data.remove(value)
@@ -601,11 +606,11 @@ class ResourcesArray(typ.Sequence[BackupMeta]):
         """
         Serialize the Array to a json object.
         """
-        with open(destiny, "w") as fp:
+        with open(destiny, "w", encoding= "utf-8") as fp:
             json.dump({
                 "list_name": self.name,
                 "content": [meta.to_dict() for meta in self._data]
-            }, fp, indent= 4)
+            }, fp, indent= 4, )
     
     def __iter__(self) -> typ.Iterator[BackupMeta]:
         return iter(self._data)
@@ -633,7 +638,7 @@ class PathBackupArray(ResourcesArray):
     def __new__(cls):
         return super().__new__().copy()
 
-class AllLists():
+class _AllLists():
     def __init__(self) -> None:
         self._data:list[ResourcesArray] = []
         self._selected = None
@@ -660,8 +665,8 @@ class AllLists():
             return
         
         with PROJECT_DIR.joinpath("all_lists").open("rb") as fp:
-            data:AllLists = pickle.load(fp)
-            if isinstance(data, AllLists) and isinstance(data._data, list):
+            data:_AllLists = pickle.load(fp)
+            if isinstance(data, _AllLists) and isinstance(data._data, list):
                 self._data = data._data
                 self._selected = data._selected
     
@@ -726,9 +731,15 @@ class AllLists():
         self._selected = self._data[index]
         return self._selected
     
+    def names(self) -> tuple[str]:
+        """
+        Return the names of all of the lists.
+        """
+        return tuple(map(lambda array: array.name, self._data))
+    
     def __check_repetition(self, value:ResourcesArray):
-        if value.name in map(lambda x: x.name, self._data):
-            raise RepeteanceError(
+        if value.name in self.names():
+            raise RepetitionError(
                 "The list is repeated."
             )
         
@@ -745,11 +756,11 @@ class AllLists():
     
     def __contains__(self, value):
         if isinstance(value, ResourcesArray):
-            return value.name in map(lambda x: x.name, self._data)
+            return value.name in self.names()
 
         return False
     
-all_lists = AllLists()    
+all_lists = _AllLists()    
 
 #* ----------------------
 #*      EXCEPTIONS
@@ -761,14 +772,8 @@ class NotAFileError(OSError):
     """
     pass
 
-class RepeteanceError(Exception):
+class RepetitionError(Exception):
     """
     The value is repeated.
-    """
-    pass
-
-class NextRoundAdvice(Exception):
-    """
-    Exception to jump to the next round of the mainloop.
     """
     pass

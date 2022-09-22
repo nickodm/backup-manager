@@ -19,19 +19,25 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from pathlib import Path
 import logging
 from ctypes import windll
-from typing import Literal as _Literal
+from typing import Literal
 from models import *
 import tkinter.filedialog as tkFd
 import consoletools as ctools
 
 __version__ = "0.2.0"
 
+class NextRoundAdvice(Exception):
+    """
+    Exception to jump to the next round of the mainloop.
+    """
+    pass
+
 def exit():
     from sys import exit as sys_exit
     all_lists.save()
     sys_exit()
     
-def check_index(num:str, allow_slice:bool = True, iter:_Literal['a', 's'] = 'a') -> int|slice:
+def check_index(num:str, allow_slice:bool = True, iter:Literal['a', 's'] = 'a') -> int|slice:
     assert iter in ('a', 's')
     iter_ = all_lists if iter == 'a' else all_lists.selected
 
@@ -151,12 +157,12 @@ def main():
                 case _:
                     print("You must add \"file\" or \"dir\".")
         
-        case "del":
+        case "pop":
             check_selected()
-            index = check_index(enter[1])
-            deleted = all_lists.selected.pop(index)
-            print(f"The {deleted.type} \"{deleted.name}\" was deleted from the list.")
-            logging.info(f"The {deleted.type} \"{deleted.name}\" was deleted from the list.")
+            index = check_index(enter[1], iter= 's')
+            for meta in all_lists.selected.pop(index):
+                print(f"The {meta.type} \"{meta.name}\" was deleted from the list.")
+                logging.info(f"The {meta.type} \"{meta.name}\" was deleted from the list.")
         
         case "show":
             check_selected()
@@ -196,27 +202,30 @@ def main():
             match enter[1]:
                 case "show":
                     if not enter.get(2, None):
+                        print()
                         print(all_lists.mention())
+                        print()
                         return
                     
-                    index = check_index(enter[2])
-                    
-                    print(all_lists[index].report())
+                    print(all_lists[check_index(enter[2], False)].report())
                     
                 case "select":
-                    index = check_index(enter[2])
-
-                    print("The \"%s\" list was selected."%all_lists.select(index).name)
+                    index = check_index(enter[2], False)
+                    print("The list \"%s\" was selected."%all_lists.select(index).name)
                     
                 case "create":
-                    name = enter.get(2, "")
+                    name = enter.get(2, None)
 
                     if name in ("exit", "cancel"):
                         print("The list was not created.")
                         return
                     
-                    if name == "":
+                    if not name:
                         print("Please, choose a name for the list.")
+                        return
+                    
+                    if name in all_lists.names():
+                        print("There is already a list with that name.")
                         return
                     
                     all_lists.add(ResourcesArray(name))
@@ -229,7 +238,7 @@ def main():
                         defaultextension= "*.json"
                     )
                     
-                    if path == "":
+                    if not path:
                         print("The list was not imported.")
                         return
                     
@@ -249,7 +258,7 @@ def main():
                     print(f"The list \"{importing.name}\" was imported.")
                     
                 case "export":
-                    index = check_index(enter[2])
+                    index = check_index(enter[2], allow_slice= False)
 
                     path = tkFd.asksaveasfilename(
                         title= "Export List",
@@ -265,10 +274,9 @@ def main():
                     all_lists[index].export(path)
                     print(f"The list was exported to \"{Path(path).resolve()}\".")
                     
-                case "remove":
+                case "pop":
                     index = check_index(enter[2])
-
-                    print(f"The list \"{all_lists.pop(index).name}\" was removed.")
+                    print(f"The list \"{all_lists.pop(index).name}\" was deleted.")
                     
                 case "rename":
                     index = check_index(enter[2])
