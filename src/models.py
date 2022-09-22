@@ -759,8 +759,13 @@ class _AllLists():
             return value.name in self.names()
 
         return False
-    
-all_lists = _AllLists()    
+
+class AllLists(_AllLists):
+    def __new__(cls):
+        logging.info("Transforming AllLists to _AllLists.")
+        return _AllLists()
+
+all_lists = _AllLists()
 
 #* ----------------------
 #*      EXCEPTIONS
