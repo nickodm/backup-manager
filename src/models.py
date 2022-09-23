@@ -19,7 +19,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
 from abc import ABC, abstractmethod
 from consoletools import format_delta, format_number, format_size
 import os, logging, sys, pickle, json, zipfile
@@ -328,6 +327,7 @@ class BackupFile(BackupMeta):
     
 class BackupDir(BackupMeta): #TODO: Add get() and __getitem__() methods
     def __init__(self, origin_path: Path, destiny_path: Path = ..., *, compress:bool = False) -> None:
+        assert origin_path.suffix != ".zip"
         super().__init__(origin_path, destiny_path)
         self._compress = compress
         
@@ -363,6 +363,36 @@ class BackupDir(BackupMeta): #TODO: Add get() and __getitem__() methods
         """
         return self._compress
     
+    def get(self, at_path:str, *, source:typ.Literal['o', 'd'] = 'o') -> BackupFile|None:
+        """
+        Get a file in the directory. Return `None` if it doesn't exists.
+        """
+        assert source in ('o', 'd')
+        o, d = (self._origin, self._destiny) if source == 'o' else (self._destiny, self._origin)
+        
+        if zipfile.is_zipfile(o):
+            with zipfile.ZipFile(o) as fp:
+                if not at_path in fp.namelist():
+                    return
+                
+                return BackupFile.from_ext(self._origin / at_path, self._destiny, at_path)
+        else:
+            if not Path(o / at_path).exists():
+                return
+            
+            if zipfile.is_zipfile(d):
+                return BackupFile.from_ext(self._origin / at_path, self._destiny, at_path)
+            else:
+                return BackupFile(self._origin / at_path, self._destiny / at_path)
+
+    def __getitem__(self, at_path:str) -> BackupFile:
+        file = self.get(at_path)
+        if not file:
+            raise FileNotFoundError(
+                "The file doesn't exists."
+            )
+        return file
+
     def are_different(self, strict:bool = False) -> bool:
         if not (self._origin.exists() and self._destiny.exists()):
             return True
