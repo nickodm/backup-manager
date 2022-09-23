@@ -298,16 +298,11 @@ class BackupFile(BackupMeta):
             return False
         
     def report(self, index: int = ...) -> str:
-        import re
-        from pathlib import PurePath
         r = super().report(index)
         if not self._at_path:
+        from re import sub
             return r
-        
-        d_path = re.search("(DESTINY\s*:\s*)(.*)\n", r)
-        if not d_path:
-            return r
-        return r.replace(d_path.group(), d_path.group(1) + d_path.group(2) + " | " + str(PurePath(self._at_path)) + "\n")
+        return sub("(?=DESTINY\s:\s)(.*)\n", fr"\1 | {repr(str(Path(self._at_path)))[1:-1]}\n", r)
         
     def __repr__(self) -> str:
         if not self._at_path:
@@ -466,7 +461,7 @@ class BackupDir(BackupMeta): #TODO: Add get() and __getitem__() methods
             for path, dirs, files in os.walk(o):              
                 for file in files:
                     if zipfile.is_zipfile(d):
-                        yield BackupFile.from_ext(Path(path) / file, self.destiny, Path(path).joinpath(file).relative_to(o))
+                        yield BackupFile.from_ext(Path(path) / file, self.destiny, str(Path(path).joinpath(file).relative_to(o)))
                     else:
                         yield BackupFile(Path(path) / file, self.destiny / Path(path).joinpath(file).relative_to(o))
         
