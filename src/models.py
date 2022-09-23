@@ -300,8 +300,8 @@ class BackupFile(BackupMeta):
     def report(self, index: int = ...) -> str:
         r = super().report(index)
         if not self._at_path:
-        from re import sub
             return r
+        from re import sub
         return sub("(?=DESTINY\s:\s)(.*)\n", fr"\1 | {repr(str(Path(self._at_path)))[1:-1]}\n", r)
         
     def __repr__(self) -> str:
