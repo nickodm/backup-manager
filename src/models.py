@@ -26,6 +26,7 @@ import typing as typ, datetime as dt, shutil as sh
 
 __all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR", "ResourcesArray", "all_lists"]
 _AT = typ.TypeVar("_AT")
+_BT = typ.TypeVar("_BT")
 
 PROJECT_DIR:Path = Path(os.getenv("APPDATA") + "/Nicko's Backup Manager") if sys.platform == "win32" else Path.home() / ".Nicko's Backup Manager"
 
@@ -474,12 +475,7 @@ class BackupDir(BackupMeta):
         """
         Walk over the directory.
         """
-        assert source in ('o', 'd')
-        
-        if source == "o":
-            o, d = self._origin, self._destiny
-        else:
-            o, d = self._destiny, self._origin
+        o, d = self._get_source(source, True)
         
         if zipfile.is_zipfile(o):
             with zipfile.ZipFile(o, "r") as fp:
@@ -495,8 +491,33 @@ class BackupDir(BackupMeta):
                         yield BackupFile.from_ext(Path(path) / file, self.destiny, str(Path(path).joinpath(file).relative_to(o)))
                     else:
                         yield BackupFile(Path(path) / file, self.destiny / Path(path).joinpath(file).relative_to(o))
-
-    def where(): return NotImplemented #TODO
+    @typ.overload
+    def where(self, 
+              filter:typ.Callable[[BackupFile], bool],
+              *, source:typ.Literal['o', 'd'] = 'd'
+    ) -> typ.Generator[BackupFile, None, None]: ...
+    @typ.overload
+    def where(self, 
+              filter:typ.Callable[[BackupFile], bool],
+              mapper:typ.Callable[[BackupFile], _AT] = ..., 
+              *, source:typ.Literal['o', 'd'] = 'd'
+    ) -> typ.Generator[_AT, None, None]: ...
+    
+    def where(self, 
+              filter:typ.Callable[[BackupFile], bool],
+              mapper:typ.Callable[[BackupFile], _AT] = ..., 
+              *, source:typ.Literal['o', 'd'] = 'd'
+    ):
+        """
+        Apply `mapper` to each file that returns `True` when passed to `filter` and yield it. If there are not a `mapper`, 
+        it will yield the `BackupFile`.
+        """
+        if mapper == Ellipsis:
+            mapper = lambda file: file
+        
+        for file in self.walk(source):
+            if filter(file):
+                yield mapper(file)
 
     def __iter__(self): #TODO
         return NotImplemented
@@ -524,6 +545,24 @@ class BackupDir(BackupMeta):
             raise TypeError(
                 "The value must be an str, BackupFile or Path (an at path)."
             )
+    
+    @typ.overload
+    def _get_source(self, s:typ.Literal['o', 'd'] = ...) -> Path: ...
+    @typ.overload
+    def _get_source(self, s:typ.Literal['o', 'd'] = ..., order:bool = False) -> tuple[Path, Path]: ...
+    
+    def _get_source(self, s:typ.Literal['o', 'd'] = ..., order:bool = False):
+        assert s in ('o', 'd', Ellipsis), \
+            f"__s must be 'o' (by origin) or 'd' (by destiny), not '{s}'."
+
+        x, y = (self._origin, self._destiny) if s in ('o', ...) else (self._destiny, self._origin)
+
+        if order:
+            return x, y
+        
+        if s == Ellipsis and not x.exists():
+            return y        
+        return x
 
 class ResourcesArray(typ.Sequence[BackupMeta]):
     """
