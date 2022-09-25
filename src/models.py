@@ -18,7 +18,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from pathlib import Path
+from pathlib import Path, PurePath
 from abc import ABC, abstractmethod
 from consoletools import format_delta, format_number, format_size
 import os, logging, sys, pickle, json, zipfile
@@ -196,29 +196,29 @@ class BackupMeta(ABC):
 class BackupFile(BackupMeta):
     def __init__(self, origin_path: Path, destiny_path: Path) -> None:
         super().__init__(origin_path, destiny_path)
-        self._at_path:str|None = None
+        self._at:PurePath|None = None
         
     @classmethod
-    def from_ext(cls, origin_path:Path, zip_file:Path, at_path:str):
+    def in_dir(cls, origin_path:Path, destiny_path:Path, at_path:str|PurePath):
         self = object.__new__(cls)
-        self.__init__(origin_path, zip_file)
-        self._at_path:str|None = at_path
+        self.__init__(origin_path, destiny_path)
+        self._at:PurePath = at_path if isinstance(at_path, PurePath) else PurePath(at_path)
         return self
     
     @classmethod
     def from_dict(cls, dictt: dict):
         self = super().from_dict(dictt)
-        self._at_path = dictt.get('at_path', None)
+        self._at = dictt.get('at_path', None)
         return self
+    
+    def to_dict(self) -> dict:
+        dictt = super().to_dict()
+        dictt['at_path'] = self._at
+        return dictt
     
     @property
     def resource_size(self) -> int:
         return self._origin.stat(follow_symlinks= True).st_size
-    
-    def to_dict(self) -> dict:
-        dictt = super().to_dict()
-        dictt['at_path'] = self._at_path
-        return dictt
 
     def are_different(self, strict:bool = False) -> bool:
         from math import trunc
@@ -230,13 +230,14 @@ class BackupFile(BackupMeta):
         
         dfp = self._destiny.open('rb')
         
-        if self._at_path:
+        if zipfile.is_zipfile(self._destiny):
+            at_path = str(self._at.as_posix())
             with zipfile.ZipFile(self._destiny) as fp:
-                if not self._at_path in fp.namelist():
+                if not at_path in fp.namelist():
                     return True # The file doesn't exists.
-                destiny_mtime = dt.datetime(*fp.getinfo(self._at_path).date_time)
+                destiny_mtime = dt.datetime(*fp.getinfo(at_path).date_time)
                 dfp.close()
-                dfp = fp.open(self._at_path, 'r')
+                dfp = fp.open(at_path, 'r')
         
         # Check the mtime diff
         if -1 < (origin_mtime - destiny_mtime).total_seconds() > 1:
@@ -251,7 +252,7 @@ class BackupFile(BackupMeta):
         return False
     
     def backup(self, force:bool = False) -> bool: #TODO: Implement ext-file support.
-        if self._at_path:
+        if self._at:
             logging.info("Tried to backup an ext-file.")
             return False
         
@@ -275,7 +276,7 @@ class BackupFile(BackupMeta):
             return False
         
     def restore(self, force:bool = False) -> bool: #TODO: Implement ext-file support.
-        if self._at_path:
+        if self._at:
             logging.info("Tried to restore an ext-file.")
             return False
 
@@ -299,27 +300,27 @@ class BackupFile(BackupMeta):
         
     def report(self, index: int = ...) -> str:
         r = super().report(index)
-        if not self._at_path:
+        if not self._at:
             return r
         from re import sub
-        return sub("(?=DESTINY\s:\s)(.*)\n", fr"\1 | {repr(str(Path(self._at_path)))[1:-1]}\n", r)
+        return sub("(?=DESTINY\s:\s)(.*)\n", fr"\1 | {repr(str(Path(self._at)))[1:-1]}\n", r)
         
     def __repr__(self) -> str:
-        if not self._at_path:
+        if not self._at:
             return super().__repr__()
-        return super().__repr__()[:-1] + f", at_path= {self._at_path})"
+        return super().__repr__()[:-1] + f", at_path= {self._at})"
     
     def __eq__(self, value):
-        return super().__eq__(value) and Path(self._at_path) == Path(value._at_path)
+        return super().__eq__(value) and self._at == value._at
     
     def __getstate__(self):
         state = super().__getstate__()
-        state['at_path'] = self._at_path
+        state['at_path'] = self._at
         return state
     
     def __setstate__(self, state: dict):
         super().__setstate__(state)
-        self._at_path = state.get('at_path', None)
+        self._at = state.get('at_path', None)
     
 class BackupDir(BackupMeta):
     def __init__(self, origin_path: Path, destiny_path: Path = ..., *, compress:bool = False) -> None:
@@ -359,27 +360,25 @@ class BackupDir(BackupMeta):
         """
         return self._compress
     
-    def get(self, at_path:str, *, source:typ.Literal['o', 'd'] = 'o') -> BackupFile|None:
+    def get(self, at_path:str, *, source:typ.Literal['o', 'd'] = ...) -> BackupFile|None: #TODO: It can not return a BackupFile if the requested is a directory.
         """
-        Get a file in the directory. Return `None` if it doesn't exists.
+        Get a file of the directory. Return `None` if it doesn't exists or if it's a file.
         """
-        assert source in ('o', 'd')
-        o, d = (self._origin, self._destiny) if source == 'o' else (self._destiny, self._origin)
+        o = self._get_source(source)
         
         if zipfile.is_zipfile(o):
             with zipfile.ZipFile(o) as fp:
-                if not at_path in fp.namelist():
+                if not at_path in fp.namelist() or fp.getinfo(at_path).is_dir():
                     return
                 
-                return BackupFile.from_ext(self._origin / at_path, self._destiny, at_path)
+                return BackupFile.in_dir(self._origin / at_path, self._destiny, at_path)
         else:
-            if not o.joinpath(at_path).exists():
+            if not o.joinpath(at_path).exists() or o.joinpath(at_path).is_dir():
                 return
             
-            if zipfile.is_zipfile(d):
-                return BackupFile.from_ext(self._origin / at_path, self._destiny, at_path)
-            else:
-                return BackupFile(self._origin / at_path, self._destiny / at_path)
+            return BackupFile.in_dir(self._origin / at_path, 
+                                     self._destiny / (at_path if not zipfile.is_zipfile(self._destiny) else ''), 
+                                     at_path)
 
     def __getitem__(self, at_path:str) -> BackupFile:
         assert isinstance(at_path, str), f"at_path must be an str, not {type(at_path).__name__}."
@@ -471,42 +470,43 @@ class BackupDir(BackupMeta):
             logging.exception(exc)
             return False
     
-    def walk(self, source:typ.Literal['o', 'd'] = 'o') -> typ.Generator[BackupFile, None, None]: #TODO: Optimize this
+    def walk(self, source:typ.Literal['o', 'd'] = ...) -> typ.Generator[BackupFile, None, None]: #TODO: Optimize this
         """
         Walk over the directory.
         """
-        o, d = self._get_source(source, True)
+        src = self._get_source(source)
+        logging.info(f"Walking; name= {self.name}, src= {src} ({'o' if src is self._origin else 'd'})")
         
-        if zipfile.is_zipfile(o):
-            with zipfile.ZipFile(o, "r") as fp:
+        if zipfile.is_zipfile(src):
+            with zipfile.ZipFile(src, "r") as fp:
                 for file in fp.namelist():
                     if fp.getinfo(file).is_dir():
                         continue
                     
-                    yield BackupFile.from_ext(self._origin / Path(o / file).relative_to(o), o, file)
+                    yield BackupFile.in_dir(self._origin / file, self._destiny, file)
         else:
-            for path, dirs, files in os.walk(o):              
+            for path, dirs, files in os.walk(src):              
                 for file in files:
-                    if zipfile.is_zipfile(d):
-                        yield BackupFile.from_ext(Path(path) / file, self.destiny, str(Path(path).joinpath(file).relative_to(o)))
-                    else:
-                        yield BackupFile(Path(path) / file, self.destiny / Path(path).joinpath(file).relative_to(o))
+                    at = Path(path).joinpath(file).relative_to(src)
+                    yield BackupFile.in_dir(self._origin / at,
+                                            self._destiny / (at if not zipfile.is_zipfile(self._destiny) else ''), 
+                                            at)
     @typ.overload
     def where(self, 
               filter:typ.Callable[[BackupFile], bool],
-              *, source:typ.Literal['o', 'd'] = 'd'
+              *, source:typ.Literal['o', 'd'] = ...
     ) -> typ.Generator[BackupFile, None, None]: ...
     @typ.overload
     def where(self, 
               filter:typ.Callable[[BackupFile], bool],
               mapper:typ.Callable[[BackupFile], _AT] = ..., 
-              *, source:typ.Literal['o', 'd'] = 'd'
+              *, source:typ.Literal['o', 'd'] = ...
     ) -> typ.Generator[_AT, None, None]: ...
     
     def where(self, 
               filter:typ.Callable[[BackupFile], bool],
               mapper:typ.Callable[[BackupFile], _AT] = ..., 
-              *, source:typ.Literal['o', 'd'] = 'd'
+              *, source:typ.Literal['o', 'd'] = ...
     ):
         """
         Apply `mapper` to each file that returns `True` when passed to `filter` and yield it. If there are not a `mapper`, 
@@ -533,19 +533,17 @@ class BackupDir(BackupMeta):
     def __repr__(self) -> str:
         return super().__repr__()[:-1] + f", compress= {self._compress})"
     
-    def __contains__(self, value:str|BackupFile|Path):
+    def __contains__(self, value:str|BackupFile|PurePath):
+        assert isinstance(value, (str, BackupFile, PurePath)), \
+            f"The value must be an str, BackupFile or Path (an at path), not {type(value).__name__}."
         src = 'o' if self._origin.exists() else 'd'
         if isinstance(value, BackupFile):
-            return value in self.walk(src)
+            value:PurePath = value._at
+        elif isinstance(value, str):
+            value:PurePath = PurePath(value)
         
-        elif isinstance(value, (str, Path)):
-            return Path(value) in (Path(file._at_path) for file in self.walk(src))
+        return value in (file._at for file in self.walk(src))
         
-        else:
-            raise TypeError(
-                "The value must be an str, BackupFile or Path (an at path)."
-            )
-    
     @typ.overload
     def _get_source(self, s:typ.Literal['o', 'd'] = ...) -> Path: ...
     @typ.overload
@@ -561,7 +559,7 @@ class BackupDir(BackupMeta):
             return x, y
         
         if s == Ellipsis and not x.exists():
-            return y        
+            return y
         return x
 
 class ResourcesArray(typ.Sequence[BackupMeta]):
