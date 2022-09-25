@@ -360,9 +360,9 @@ class BackupDir(BackupMeta):
         """
         return self._compress
     
-    def get(self, at_path:str, *, source:typ.Literal['o', 'd'] = ...) -> BackupFile|None: #TODO: It can not return a BackupFile if the requested is a directory.
+    def get(self, at_path:str, *, source:typ.Literal['o', 'd'] = ...) -> BackupFile|None:
         """
-        Get a file of the directory. Return `None` if it doesn't exists or if it's a file.
+        Get a file of the directory. Return `None` if it doesn't exists or if it's a dir.
         """
         o = self._get_source(source)
         
@@ -399,7 +399,9 @@ class BackupDir(BackupMeta):
             
         return False    
     
-    def backup(self, force:bool = False) -> bool:
+    def backup(self, force:bool = False, falses:typ.Literal['ignore', 'return'] = 'return') -> bool:
+        falses = falses.lower()
+        assert falses in ('ignore', 'return')
         if not force and not self.are_different():
             logging.info(f"{self.name!r} has not been changed.")
             return False
@@ -408,25 +410,30 @@ class BackupDir(BackupMeta):
             return self._save_compressed()
         
         try:
-            for file in self.walk(): #TODO: It must return False if a file returns False
-                file.backup(force= force)
-            
+            for file in self.walk('o'):
+                file.destiny.parent.mkdir(parents= True, exist_ok= True)
+                if not file.backup(force) and falses == 'return':
+                    return False
+                
             self._last_backup = dt.datetime.now()
             return True
         except BaseException as exc:
             logging.exception(exc)
             return False 
     
-    def restore(self, force:bool = False) -> bool:
+    def restore(self, force:bool = False, falses:typ.Literal['ignore', 'return'] = 'return') -> bool:
+        falses = falses.lower()
+        assert falses in ('ignore', 'return')
         if not force and not self.are_different():
             logging.info(f"{self.name!r} has not been changed.")
             return False
         
         try:
             if self._destiny.is_dir():
-                for file in self.walk('d'): #TODO: It must return False if a file returns False
+                for file in self.walk('d'):
                     file.origin.parent.mkdir(parents= True, exist_ok= True)
-                    file.restore()
+                    if not file.restore() and falses == 'return':
+                        return False
                 
                 return True
             else:
