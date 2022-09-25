@@ -309,7 +309,7 @@ class BackupFile(BackupMeta):
         return super().__repr__()[:-1] + f", at_path= {self._at_path})"
     
     def __eq__(self, value):
-        return super().__eq__(value) and self._at_path == value._at_path
+        return super().__eq__(value) and Path(self._at_path) == Path(value._at_path)
     
     def __getstate__(self):
         state = super().__getstate__()
@@ -320,7 +320,7 @@ class BackupFile(BackupMeta):
         super().__setstate__(state)
         self._at_path = state.get('at_path', None)
     
-class BackupDir(BackupMeta): #TODO: Add get() and __getitem__() methods
+class BackupDir(BackupMeta):
     def __init__(self, origin_path: Path, destiny_path: Path = ..., *, compress:bool = False) -> None:
         assert origin_path.suffix != ".zip"
         super().__init__(origin_path, destiny_path)
@@ -372,7 +372,7 @@ class BackupDir(BackupMeta): #TODO: Add get() and __getitem__() methods
                 
                 return BackupFile.from_ext(self._origin / at_path, self._destiny, at_path)
         else:
-            if not Path(o / at_path).exists():
+            if not o.joinpath(at_path).exists():
                 return
             
             if zipfile.is_zipfile(d):
@@ -381,6 +381,7 @@ class BackupDir(BackupMeta): #TODO: Add get() and __getitem__() methods
                 return BackupFile(self._origin / at_path, self._destiny / at_path)
 
     def __getitem__(self, at_path:str) -> BackupFile:
+        assert isinstance(at_path, str), f"at_path must be an str, not {type(at_path).__name__}."
         file = self.get(at_path)
         if not file:
             raise FileNotFoundError(
@@ -494,6 +495,11 @@ class BackupDir(BackupMeta): #TODO: Add get() and __getitem__() methods
                         yield BackupFile.from_ext(Path(path) / file, self.destiny, str(Path(path).joinpath(file).relative_to(o)))
                     else:
                         yield BackupFile(Path(path) / file, self.destiny / Path(path).joinpath(file).relative_to(o))
+
+    def where(): return NotImplemented #TODO
+
+    def __iter__(self): #TODO
+        return NotImplemented
         
     def __getstate__(self):
         state = super().__getstate__()
@@ -505,6 +511,19 @@ class BackupDir(BackupMeta): #TODO: Add get() and __getitem__() methods
     
     def __repr__(self) -> str:
         return super().__repr__()[:-1] + f", compress= {self._compress})"
+    
+    def __contains__(self, value:str|BackupFile|Path):
+        src = 'o' if self._origin.exists() else 'd'
+        if isinstance(value, BackupFile):
+            return value in self.walk(src)
+        
+        elif isinstance(value, (str, Path)):
+            return Path(value) in (Path(file._at_path) for file in self.walk(src))
+        
+        else:
+            raise TypeError(
+                "The value must be an str, BackupFile or Path (an at path)."
+            )
 
 class ResourcesArray(typ.Sequence[BackupMeta]):
     """
