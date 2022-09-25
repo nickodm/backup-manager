@@ -297,16 +297,11 @@ class BackupFile(BackupMeta):
             return False
         
     def report(self, index: int = ...) -> str:
-        import re
-        from pathlib import PurePath
         r = super().report(index)
         if not self._at_path:
             return r
-        
-        d_path = re.search("(DESTINY\s*:\s*)(.*)\n", r)
-        if not d_path:
-            return r
-        return r.replace(d_path.group(), d_path.group(1) + d_path.group(2) + " | " + str(PurePath(self._at_path)) + "\n")
+        from re import sub
+        return sub("(?=DESTINY\s:\s)(.*)\n", fr"\1 | {repr(str(Path(self._at_path)))[1:-1]}\n", r)
         
     def __repr__(self) -> str:
         if not self._at_path:
@@ -465,14 +460,9 @@ class BackupDir(BackupMeta): #TODO: Add get() and __getitem__() methods
             
         try:        
             with zipfile.ZipFile(destiny, "w") as zip_stream:
-                path_limit = 0
                 for path, _, files in os.walk(self._origin):
-                    if path_limit == 0:
-                        path_limit = len(Path(path).parts)
-                    
                     for file in files:
-                        read_path = Path(path) / file
-                        zip_stream.write(read_path, arcname= Path("/".join(read_path.parts[path_limit:])))
+                        zip_stream.write(Path(path) / file, (Path(path) / file).relative_to(self._origin))
 
             return True 
         except BaseException as exc:
@@ -501,7 +491,7 @@ class BackupDir(BackupMeta): #TODO: Add get() and __getitem__() methods
             for path, dirs, files in os.walk(o):              
                 for file in files:
                     if zipfile.is_zipfile(d):
-                        yield BackupFile.from_ext(Path(path) / file, self.destiny, Path(path).joinpath(file).relative_to(o))
+                        yield BackupFile.from_ext(Path(path) / file, self.destiny, str(Path(path).joinpath(file).relative_to(o)))
                     else:
                         yield BackupFile(Path(path) / file, self.destiny / Path(path).joinpath(file).relative_to(o))
         
@@ -512,6 +502,9 @@ class BackupDir(BackupMeta): #TODO: Add get() and __getitem__() methods
 
     def __eq__(self, value) -> bool:
         return super().__eq__(value) and self._compress == value._compress
+    
+    def __repr__(self) -> str:
+        return super().__repr__()[:-1] + f", compress= {self._compress})"
 
 class ResourcesArray(typ.Sequence[BackupMeta]):
     """
