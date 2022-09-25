@@ -519,8 +519,8 @@ class BackupDir(BackupMeta):
             if filter(file):
                 yield mapper(file)
 
-    def __iter__(self): #TODO
-        return NotImplemented
+    def __iter__(self):
+        return self.walk()
         
     def __getstate__(self):
         state = super().__getstate__()
