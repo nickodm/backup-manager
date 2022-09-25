@@ -217,8 +217,21 @@ class BackupFile(BackupMeta):
         return dictt
     
     @property
+    def at(self) -> PurePath|None:
+        """
+        The path of the file relative to the parent directory.
+        """
+        return self._at
+    
+    @property
     def resource_size(self) -> int:
         return self._origin.stat(follow_symlinks= True).st_size
+    
+    def is_extfile(self) -> bool:
+        """
+        Check if the file is in a zipfile.
+        """
+        return self._destiny.suffix == '.zip' and not not self._at
 
     def are_different(self, strict:bool = False) -> bool:
         from math import trunc
@@ -231,7 +244,7 @@ class BackupFile(BackupMeta):
         dfp = self._destiny.open('rb')
         
         if zipfile.is_zipfile(self._destiny):
-            at_path = str(self._at.as_posix())
+            at_path = self._at.as_posix()
             with zipfile.ZipFile(self._destiny) as fp:
                 if not at_path in fp.namelist():
                     return True # The file doesn't exists.
@@ -303,7 +316,7 @@ class BackupFile(BackupMeta):
         if not self._at:
             return r
         from re import sub
-        return sub("(?=DESTINY\s:\s)(.*)\n", fr"\1 | {repr(str(Path(self._at)))[1:-1]}\n", r)
+        return sub("(?=DESTINY\s:\s)(.*)\n", fr"\1 | {repr(str(self._at))[1:-1]}\n", r)
         
     def __repr__(self) -> str:
         if not self._at:
