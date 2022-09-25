@@ -31,10 +31,14 @@ _BT = typ.TypeVar("_BT")
 PROJECT_DIR:Path = Path(os.getenv("APPDATA") + "/Nicko's Backup Manager") if sys.platform == "win32" else Path.home() / ".Nicko's Backup Manager"
 
 class BackupMeta(ABC):
+    
+    __slots__ = ['_origin', '_destiny', '_last_backup', '_hash']
+    
     def __init__(self, origin_path:Path, destiny_path:Path) -> None:
         self._origin = origin_path
         self._destiny = destiny_path
         self._last_backup:dt.datetime|None = None
+        self._hash:int|None = None
         
     @classmethod
     def from_dict(cls, dictt:dict):
@@ -178,6 +182,9 @@ class BackupMeta(ABC):
     def __exit__(self, t, v, tck):
         logging.exception(v)
         
+    def __hash__(self):
+        return hash((self.type, self.origin, self.destiny))    
+
     # def __str__(self):
     #     return self.report()
     
@@ -194,6 +201,15 @@ class BackupMeta(ABC):
         return not self.__eq__(value)
 
 class BackupFile(BackupMeta):
+
+    __slots__ = BackupMeta.__slots__ + ['_at']
+    
+    def __hash__(self):
+        if self._hash:
+            return self._hash
+        self._hash = hash((super().__hash__(), self.at))
+        return self._hash
+    
     def __init__(self, origin_path: Path, destiny_path: Path) -> None:
         super().__init__(origin_path, destiny_path)
         self._at:PurePath|None = None
@@ -336,6 +352,15 @@ class BackupFile(BackupMeta):
         self._at = state.get('at_path', None)
     
 class BackupDir(BackupMeta):
+    
+    __slots__ = BackupMeta.__slots__ + ['_compress']
+    
+    def __hash__(self):
+        if self._hash:
+            return self._hash
+        self._hash = hash((super().__hash__(), self._compress))
+        return self._hash
+    
     def __init__(self, origin_path: Path, destiny_path: Path = ..., *, compress:bool = False) -> None:
         assert origin_path.suffix != ".zip"
         super().__init__(origin_path, destiny_path)
