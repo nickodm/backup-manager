@@ -373,15 +373,16 @@ class BackupDir(BackupMeta):
         """
         return self._compress
     
-    def get(self, at_path:str, *, source:typ.Literal['o', 'd'] = ...) -> BackupFile|None:
+    def get(self, at_path:str|PurePath, *, source:typ.Literal['o', 'd'] = ...) -> BackupFile|None:
         """
         Get a file of the directory. Return `None` if it doesn't exists or if it's a dir.
         """
         o = self._get_source(source)
+        at_path = PurePath(at_path)
         
         if zipfile.is_zipfile(o):
             with zipfile.ZipFile(o) as fp:
-                if not at_path in fp.namelist() or fp.getinfo(at_path).is_dir():
+                if not at_path.as_posix() in fp.namelist() or fp.getinfo(at_path.as_posix()).is_dir():
                     return
                 
                 return BackupFile.in_dir(self._origin / at_path, self._destiny, at_path)
@@ -390,7 +391,7 @@ class BackupDir(BackupMeta):
                 return
             
             return BackupFile.in_dir(self._origin / at_path, 
-                                     self._destiny / (at_path if not zipfile.is_zipfile(self._destiny) else ''), 
+                                     self._destiny / (at_path if self.destiny.suffix != '.zip' else ''), 
                                      at_path)
 
     def __getitem__(self, at_path:str) -> BackupFile:
@@ -450,7 +451,7 @@ class BackupDir(BackupMeta):
                 
                 return True
             else:
-                with zipfile.ZipFile(self._destiny, "r") as zip_fp:
+                with zipfile.ZipFile(self._destiny) as zip_fp:
                     zip_fp.extractall(self._origin)
             
                 return True
@@ -490,7 +491,7 @@ class BackupDir(BackupMeta):
             logging.exception(exc)
             return False
     
-    def walk(self, source:typ.Literal['o', 'd'] = ...) -> typ.Generator[BackupFile, None, None]: #TODO: Optimize this
+    def walk(self, source:typ.Literal['o', 'd'] = ...) -> typ.Generator[BackupFile, None, None]:
         """
         Walk over the directory.
         """
@@ -498,18 +499,18 @@ class BackupDir(BackupMeta):
         logging.info(f"Walking; name= {self.name}, src= {src} ({'o' if src is self._origin else 'd'})")
         
         if zipfile.is_zipfile(src):
-            with zipfile.ZipFile(src, "r") as fp:
+            with zipfile.ZipFile(src) as fp:
                 for file in fp.namelist():
                     if fp.getinfo(file).is_dir():
                         continue
                     
-                    yield BackupFile.in_dir(self._origin / file, self._destiny, file)
+                    yield BackupFile.in_dir(self._origin / file, self._destiny, PurePath(file))
         else:
             for path, dirs, files in os.walk(src):              
                 for file in files:
-                    at = Path(path).joinpath(file).relative_to(src)
+                    at = PurePath(path).joinpath(file).relative_to(src)
                     yield BackupFile.in_dir(self._origin / at,
-                                            self._destiny / (at if not zipfile.is_zipfile(self._destiny) else ''), 
+                                            self._destiny / (at if not self.destiny.suffix == '.zip' else ''), 
                                             at)
     @typ.overload
     def where(self, 
