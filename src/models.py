@@ -26,7 +26,6 @@ import typing as typ, datetime as dt, shutil as sh
 
 __all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR", "ResourcesArray", "all_lists"]
 _AT = typ.TypeVar("_AT")
-_BT = typ.TypeVar("_BT")
 
 PROJECT_DIR:Path = Path(os.getenv("APPDATA") + "/Nicko's Backup Manager") if sys.platform == "win32" else Path.home() / ".Nicko's Backup Manager"
 
@@ -116,6 +115,12 @@ class BackupMeta(ABC):
         Check if the origin and destiny resources are different.
         """
         pass
+    
+    def exists(self) -> tuple[bool, bool]:
+        """
+        Return a tuple representing the existence of the origin and the destiny (in that order) of the resource.
+        """
+        return self.origin.exists(), self.destiny.exists()
     
     def report(self, index:int = ...) -> str:
         """
@@ -239,6 +244,14 @@ class BackupFile(BackupMeta):
         """
         return self._at
     
+    def exists(self) -> tuple[bool, bool]:
+        exists = super().exists()
+        if not self.is_extfile():
+            return exists
+        exists = list(exists)
+        exists[1] = zipfile.Path(self.destiny, self.at.as_posix()).exists()
+        return tuple(exists)
+    
     @property
     def resource_size(self) -> int:
         return self._origin.stat(follow_symlinks= True).st_size
@@ -247,7 +260,7 @@ class BackupFile(BackupMeta):
         """
         Check if the file is in a zipfile.
         """
-        return self._destiny.suffix == '.zip' and not not self._at
+        return (zipfile.is_zipfile(self.destiny) or self.destiny.suffix == '.zip') and bool(self.at)
 
     def are_different(self, strict:bool = False) -> bool:
         from math import trunc
@@ -281,7 +294,7 @@ class BackupFile(BackupMeta):
         return False
     
     def backup(self, force:bool = False) -> bool: #TODO: Implement ext-file support.
-        if self._at:
+        if self.is_extfile():
             logging.info("Tried to backup an ext-file.")
             return False
         
@@ -305,7 +318,7 @@ class BackupFile(BackupMeta):
             return False
         
     def restore(self, force:bool = False) -> bool: #TODO: Implement ext-file support.
-        if self._at:
+        if self.is_extfile():
             logging.info("Tried to restore an ext-file.")
             return False
 
