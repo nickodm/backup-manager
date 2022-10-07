@@ -27,7 +27,8 @@ import typing as typ, datetime as dt, shutil as sh
 __all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR", "ResourcesArray", "all_lists"]
 _AT = typ.TypeVar("_AT")
 
-PROJECT_DIR:Path = Path(os.getenv("APPDATA") + "/Nicko's Backup Manager") if sys.platform == "win32" else Path.home() / ".Nicko's Backup Manager"
+PROJECT_DIR:Path = Path(os.getenv("APPDATA") + "/Nicko's Backup Manager") if sys.platform == "win32" else \
+    Path.home() / ".Nicko's Backup Manager"
 
 class BackupMeta(ABC):
     
@@ -89,7 +90,7 @@ class BackupMeta(ABC):
     
     @property
     @abstractmethod
-    def resource_size(self) -> int:
+    def size(self) -> int:
         """
         The size of the resource in bytes.
         """
@@ -138,7 +139,7 @@ class BackupMeta(ABC):
         report += f"ORIGIN\t: {self._origin}\n"
         report += f"DESTINY\t: {self._destiny}\n"
         report += f"TYPE\t: {self.type.upper()}\n"
-        report += f"SIZE\t: {format_size(self.resource_size)}\n"
+        report += f"SIZE\t: {format_size(self.size)}\n"
         
         if self.last_backup != None:
             diff = dt.datetime.now() - self._last_backup
@@ -190,9 +191,6 @@ class BackupMeta(ABC):
     def __hash__(self):
         return hash((self.type, self.origin, self.destiny))    
 
-    # def __str__(self):
-    #     return self.report()
-    
     def __repr__(self) -> str:
         return f"{type(self).__name__}(origin= {self._origin}, destiny= {self._destiny})"
     
@@ -253,7 +251,7 @@ class BackupFile(BackupMeta):
         return tuple(exists)
     
     @property
-    def resource_size(self) -> int:
+    def size(self) -> int:
         return self._origin.stat(follow_symlinks= True).st_size
     
     def is_extfile(self) -> bool:
@@ -386,10 +384,10 @@ class BackupDir(BackupMeta):
         return self
         
     @property
-    def resource_size(self) -> int:
+    def size(self) -> int:
         size = 0
         for file in self.walk():
-            size += file.resource_size
+            size += file.size
             
         return size
     
@@ -460,7 +458,7 @@ class BackupDir(BackupMeta):
         
         if self._compress:
             return self._save_compressed()
-        
+    
         try:
             for file in self.walk('o'):
                 file.destiny.parent.mkdir(parents= True, exist_ok= True)
@@ -523,7 +521,8 @@ class BackupDir(BackupMeta):
                 for path, _, files in os.walk(self._origin):
                     for file in files:
                         zip_stream.write(Path(path) / file, (Path(path) / file).relative_to(self._origin))
-
+            
+            self._last_backup = dt.datetime.now()
             return True 
         except BaseException as exc:
             logging.exception(exc)
@@ -671,7 +670,7 @@ class ResourcesArray(typ.Sequence[BackupMeta]):
         """
         size = 0
         for meta in self._data:
-            size += meta.resource_size
+            size += meta.size
             
         return size
         
