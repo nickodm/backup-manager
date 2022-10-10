@@ -26,15 +26,19 @@ import typing as typ, datetime as dt, shutil as sh
 
 __all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR", "ResourcesArray", "all_lists"]
 _AT = typ.TypeVar("_AT")
-_BT = typ.TypeVar("_BT")
 
-PROJECT_DIR:Path = Path(os.getenv("APPDATA") + "/Nicko's Backup Manager") if sys.platform == "win32" else Path.home() / ".Nicko's Backup Manager"
+PROJECT_DIR:Path = Path(os.getenv("APPDATA") + "/Nicko's Backup Manager") if sys.platform == "win32" else \
+    Path.home() / ".Nicko's Backup Manager"
 
 class BackupMeta(ABC):
+    
+    __slots__ = ['_origin', '_destiny', '_last_backup', '_hash']
+    
     def __init__(self, origin_path:Path, destiny_path:Path) -> None:
         self._origin = origin_path
         self._destiny = destiny_path
         self._last_backup:dt.datetime|None = None
+        self._hash:int|None = None
         
     @classmethod
     def from_dict(cls, dictt:dict):
@@ -86,7 +90,7 @@ class BackupMeta(ABC):
     
     @property
     @abstractmethod
-    def resource_size(self) -> int:
+    def size(self) -> int:
         """
         The size of the resource in bytes.
         """
@@ -113,6 +117,12 @@ class BackupMeta(ABC):
         """
         pass
     
+    def exists(self) -> tuple[bool, bool]:
+        """
+        Return a tuple representing the existence of the origin and the destiny (in that order) of the resource.
+        """
+        return self.origin.exists(), self.destiny.exists()
+    
     def report(self, index:int = ...) -> str:
         """
         Return a report about the origin and the destiny of the file.
@@ -129,7 +139,7 @@ class BackupMeta(ABC):
         report += f"ORIGIN\t: {self._origin}\n"
         report += f"DESTINY\t: {self._destiny}\n"
         report += f"TYPE\t: {self.type.upper()}\n"
-        report += f"SIZE\t: {format_size(self.resource_size)}\n"
+        report += f"SIZE\t: {format_size(self.size)}\n"
         
         if self.last_backup != None:
             diff = dt.datetime.now() - self._last_backup
@@ -178,9 +188,9 @@ class BackupMeta(ABC):
     def __exit__(self, t, v, tck):
         logging.exception(v)
         
-    # def __str__(self):
-    #     return self.report()
-    
+    def __hash__(self):
+        return hash((self.type, self.origin, self.destiny))    
+
     def __repr__(self) -> str:
         return f"{type(self).__name__}(origin= {self._origin}, destiny= {self._destiny})"
     
@@ -194,6 +204,15 @@ class BackupMeta(ABC):
         return not self.__eq__(value)
 
 class BackupFile(BackupMeta):
+
+    __slots__ = BackupMeta.__slots__ + ['_at']
+    
+    def __hash__(self):
+        if self._hash:
+            return self._hash
+        self._hash = hash((super().__hash__(), self.at))
+        return self._hash
+    
     def __init__(self, origin_path: Path, destiny_path: Path) -> None:
         super().__init__(origin_path, destiny_path)
         self._at:PurePath|None = None
@@ -223,15 +242,23 @@ class BackupFile(BackupMeta):
         """
         return self._at
     
+    def exists(self) -> tuple[bool, bool]:
+        exists = super().exists()
+        if not self.is_extfile():
+            return exists
+        exists = list(exists)
+        exists[1] = zipfile.Path(self.destiny, self.at.as_posix()).exists()
+        return tuple(exists)
+    
     @property
-    def resource_size(self) -> int:
+    def size(self) -> int:
         return self._origin.stat(follow_symlinks= True).st_size
     
     def is_extfile(self) -> bool:
         """
         Check if the file is in a zipfile.
         """
-        return self._destiny.suffix == '.zip' and not not self._at
+        return (zipfile.is_zipfile(self.destiny) or self.destiny.suffix == '.zip') and bool(self.at)
 
     def are_different(self, strict:bool = False) -> bool:
         from math import trunc
@@ -265,7 +292,7 @@ class BackupFile(BackupMeta):
         return False
     
     def backup(self, force:bool = False) -> bool: #TODO: Implement ext-file support.
-        if self._at:
+        if self.is_extfile():
             logging.info("Tried to backup an ext-file.")
             return False
         
@@ -289,7 +316,7 @@ class BackupFile(BackupMeta):
             return False
         
     def restore(self, force:bool = False) -> bool: #TODO: Implement ext-file support.
-        if self._at:
+        if self.is_extfile():
             logging.info("Tried to restore an ext-file.")
             return False
 
@@ -336,6 +363,15 @@ class BackupFile(BackupMeta):
         self._at = state.get('at_path', None)
     
 class BackupDir(BackupMeta):
+    
+    __slots__ = BackupMeta.__slots__ + ['_compress']
+    
+    def __hash__(self):
+        if self._hash:
+            return self._hash
+        self._hash = hash((super().__hash__(), self._compress))
+        return self._hash
+    
     def __init__(self, origin_path: Path, destiny_path: Path = ..., *, compress:bool = False) -> None:
         assert origin_path.suffix != ".zip"
         super().__init__(origin_path, destiny_path)
@@ -348,10 +384,10 @@ class BackupDir(BackupMeta):
         return self
         
     @property
-    def resource_size(self) -> int:
+    def size(self) -> int:
         size = 0
         for file in self.walk():
-            size += file.resource_size
+            size += file.size
             
         return size
     
@@ -422,7 +458,7 @@ class BackupDir(BackupMeta):
         
         if self._compress:
             return self._save_compressed()
-        
+    
         try:
             for file in self.walk('o'):
                 file.destiny.parent.mkdir(parents= True, exist_ok= True)
@@ -485,7 +521,8 @@ class BackupDir(BackupMeta):
                 for path, _, files in os.walk(self._origin):
                     for file in files:
                         zip_stream.write(Path(path) / file, (Path(path) / file).relative_to(self._origin))
-
+            
+            self._last_backup = dt.datetime.now()
             return True 
         except BaseException as exc:
             logging.exception(exc)
@@ -633,7 +670,7 @@ class ResourcesArray(typ.Sequence[BackupMeta]):
         """
         size = 0
         for meta in self._data:
-            size += meta.resource_size
+            size += meta.size
             
         return size
         

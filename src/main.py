@@ -18,7 +18,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from pathlib import Path
 import logging
-from ctypes import windll
 from typing import Literal
 from models import *
 import tkinter.filedialog as tkFd
@@ -175,13 +174,10 @@ def main():
             for result, meta in all_lists.selected.backup(index):
                 if result:
                     print(f"\"{meta.name}\" was successfully copied.")
-                    logging.info(f"\"{meta.name}\" was successfully copied.")
                 elif not meta.are_different():
                     print(f'"{meta.name}" has no changes. It was not copied.')
-                    logging.info(f'"{meta.name}" has no changes. It was not copied.')
                 else:
                     print(f"\"{meta.name}\" cannot be copied.")
-                    logging.info(f"\"{meta.name}\" cannot be copied.")
                     
         case "restore":
             check_selected()
@@ -190,13 +186,10 @@ def main():
             for result, meta in all_lists.selected.restore(index):
                 if result:
                     print(f"\"{meta.name}\" was successfully copied.")
-                    logging.info(f"\"{meta.name}\" was successfully copied.")
                 elif not meta.are_different():
                     print(f'"{meta.name}" has no changes. It was not copied.')
-                    logging.info(f'"{meta.name}" has no changes. It was not copied.')
                 else:
                     print(f"\"{meta.name}\" cannot be copied.")
-                    logging.info(f"\"{meta.name}\" cannot be copied.")
                     
         case "list":
             match enter[1]:
@@ -335,34 +328,47 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
             print("Unknown command")
 
 if __name__ == "__main__":
-    windll.shcore.SetProcessDpiAwareness(1) # To avoid blurred windows
+    try:
+        from sys import platform
+        if platform == "win32":    
+            from ctypes import windll
+            windll.shcore.SetProcessDpiAwareness(1) # To avoid blurred windows
 
-    if not PROJECT_DIR.exists():
-        PROJECT_DIR.mkdir()
-        PROJECT_DIR.joinpath("logs").mkdir()
-        
-    with PROJECT_DIR.joinpath("logs/Last Log.log") as log_path:
-        if log_path.exists():
-            from os import remove
-            remove(log_path)
+        if not PROJECT_DIR.exists():
+            PROJECT_DIR.mkdir()
+            PROJECT_DIR.joinpath("logs").mkdir()
             
-        logging.basicConfig(filename= log_path, level= logging.INFO, 
-                            format= "[%(asctime)s] %(levelname)s: %(message)s", datefmt= "%b %d, %Y %H:%M:%S")
-    
-    logging.info("Starting...")
-    
-    print(
+        with PROJECT_DIR.joinpath("logs/Last Log.log") as log_path:
+            if log_path.exists():
+                from os import remove
+                remove(log_path)
+                
+            logging.basicConfig(filename= log_path, level= logging.INFO, 
+                                format= "[%(asctime)s] %(levelname)s: %(message)s", datefmt= "%b %d, %Y %H:%M:%S")
+        
+        logging.info("Starting...")
+        logging.info(f"Working in {platform!r}. \n"
+                     f"Project Dir: '{PROJECT_DIR}'\n"
+                     f"App Version: {__version__}")
+        
+        print(
 """Nicko's Backup Manager  Copyright (C) 2022  Nicolás Miranda
 This program comes with ABSOLUTELY NO WARRANTY; for details type 'license'.
 This is free software, and you are welcome to redistribute it
 under certain conditions; type 'license' for details.
 """
-    )
-    print("Loading list...")
-    all_lists.load()
-    
-    while True:
-        try:
-            main()
-        except NextRoundAdvice:
-            pass
+        )
+        print("Loading list...")
+        all_lists.load()
+        
+        while True:
+            try:
+                main()
+            except NextRoundAdvice:
+                pass
+        
+    except BaseException as exc:
+        if isinstance(exc, SystemExit):
+            raise
+        logging.exception(exc)
+        print(f'An error has ocurred: {exc!r}.\nPlease report it on "github.com/nickodm/consoletools".')
