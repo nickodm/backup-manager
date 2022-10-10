@@ -925,22 +925,26 @@ class _AllLists():
         """
         Mention all the lists that are in the list.
         """
+        from colorama import Back
+        
         if len(self._data) == 0:
             return "There are not lists."
 
-        string = ""
+        strings:list[str] = []
 
         for index, array in enumerate(self._data):
-            string += "[%s] - \"%s\""%(format_number(index), array.name[:32])
+            string = "[%s] - \"%s\""%(format_number(index), array.name[:32])
             if len(array.name) >= 32:
-                string += "...,"
+                string += "..."
                 
-            string += " | %s elements"%format_number(len(array))
+            string += " | %s element%s"%(format_number(len(array)), 's' if len(array) != 1 else '')
             
-            if index + 1 < len(self._data):
-                string += "\n"
+            if array is self.selected:
+                string = Back.GREEN + string + Back.RESET
+            
+            strings.append(string)
         
-        return string
+        return "\n".join(strings)
     
     def select(self, index:int) -> ResourcesArray:
         """

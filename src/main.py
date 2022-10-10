@@ -203,6 +203,10 @@ def main():
                     print(all_lists[check_index(enter[2], False)].report())
                     
                 case "select":
+                    if not enter[2]:
+                        print(f'The current list is "{all_lists.selected.name}" ({all_lists.selected_index}).')
+                        return
+                    
                     index = check_index(enter[2], False)
                     print("The list \"%s\" was selected."%all_lists.select(index).name)
                     
@@ -293,6 +297,9 @@ def main():
                         print("The list was not renamed.")
                     return
                 
+                case ""|None:
+                    print("You must use a subcommand also.")
+                
                 case _:
                     print("Unknown command")
                     
@@ -328,6 +335,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
             print("Unknown command")
 
 if __name__ == "__main__":
+    from colorama import init
+    init()
+    del init
+    
     try:
         from sys import platform
         if platform == "win32":    
@@ -360,6 +371,7 @@ under certain conditions; type 'license' for details.
         )
         print("Loading list...")
         all_lists.load()
+        print(f'List "{all_lists.selected.name}" is selected.')
         
         while True:
             try:
@@ -371,4 +383,4 @@ under certain conditions; type 'license' for details.
         if isinstance(exc, SystemExit):
             raise
         logging.exception(exc)
-        print(f'An error has ocurred: {exc!r}.\nPlease report it on "github.com/nickodm/consoletools".')
+        print(f'An error has ocurred: {exc!r}.\nPlease report it on "github.com/nickodm/backup-manager".')
