@@ -430,14 +430,8 @@ class BackupDir(BackupMeta):
                                      self._destiny / (at_path if self.destiny.suffix != '.zip' else ''), 
                                      at_path)
 
-    def __getitem__(self, at_path:str) -> BackupFile:
-        assert isinstance(at_path, str), f"at_path must be an str, not {type(at_path).__name__}."
-        file = self.get(at_path)
-        if not file:
-            raise FileNotFoundError(
-                "The file doesn't exists."
-            )
-        return file
+    def __getitem__(self, at_path:str|PurePath):
+        return self.get(at_path)
 
     def are_different(self, strict:bool = False) -> bool:
         if not (self._origin.exists() and self._destiny.exists()):
