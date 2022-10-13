@@ -210,7 +210,7 @@ def main():
                     index = check_index(enter[2], False)
                     print("The list \"%s\" was selected."%all_lists.select(index).name)
                     
-                case "create":
+                case "create"|"new":
                     name = enter.get(2, None)
 
                     if name in ("exit", "cancel"):
@@ -273,18 +273,22 @@ def main():
                     
                 case "pop":
                     index = check_index(enter[2])
-                    print(f"The list \"{all_lists.pop(index).name}\" was deleted.")
+                    if isinstance(index, int):
+                        index = slice(index, index + 1)
+                    
+                    for rarray in all_lists[index]:
+                        all_lists.remove(rarray)
+                        print(f"The list \"{rarray.name}\" was deleted.")
                     
                 case "rename":
-                    index = check_index(enter[2])
-                    
+                    index = check_index(enter[2], False)
                     new_name = enter.get(3, "")
                     
-                    if new_name == "":
+                    if not new_name:
                         print("Please, input a name.")
                         return
                     
-                    if new_name in map(lambda x: x.name, all_lists):
+                    if new_name in all_lists.names():
                         print(f"There is already a list named \"{new_name}\".")
                         return
                     
@@ -296,6 +300,10 @@ def main():
                     else: 
                         print("The list was not renamed.")
                     return
+                
+                # case "diff": ... #TODO: Differenciate two lists (maybe more)
+                # case "merge": ... #TODO: Merge two lists (maybe more)
+                # case "clone": ... #TODO: Clone (or copy) a list
                 
                 case ""|None:
                     print("You must use a subcommand also.")

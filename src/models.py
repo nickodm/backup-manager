@@ -851,6 +851,7 @@ class PathBackupArray(ResourcesArray):
         return super().__new__().copy()
 
 class _AllLists():
+    #TODO: Optimize this. When a resource array is requested, it should be loaded. If it is not requested, it is not loaded.
     def __init__(self) -> None:
         self._data:list[ResourcesArray] = []
         self._selected = None
