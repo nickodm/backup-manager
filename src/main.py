@@ -23,7 +23,7 @@ from models import *
 import tkinter.filedialog as tkFd
 import consoletools as ctools
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 class NextRoundAdvice(Exception):
     """
