@@ -23,7 +23,7 @@ from models import *
 import tkinter.filedialog as tkFd
 import consoletools as ctools
 
-__version__ = "0.3.1"
+__version__ = "0.3.2"
 
 class NextRoundAdvice(Exception):
     """
@@ -379,7 +379,10 @@ under certain conditions; type 'license' for details.
         )
         print("Loading list...")
         all_lists.load()
-        print(f'List "{all_lists.selected.name}" is selected.')
+        if all_lists.selected is not None:
+            print(f'List "{all_lists.selected.name}" is selected.')
+        else:
+            print("There are not a selected list.")
         
         while True:
             try:
