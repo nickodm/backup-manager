@@ -961,15 +961,37 @@ class _AllLists():
             )
         
         return value
+    
+    def count_copies(self, value:ResourcesArray) -> int:
+        """
+        Count the number of copies of `value`. 
+        Copies are `ResourcesArray` that are named like 'Copy [number] of [value.name]'.
+        """
+        if value not in self:
+            return 0
+        
+        from re import fullmatch
+        
+        count = 0
+        for array in self:
+            if fullmatch(f"Copy \d of {value.name}", array.name):
+                count += 1
                 
-    def __getitem__(self, index):
+        return count
+        
+    @typ.overload
+    def __getitem__(self, index:int) -> ResourcesArray: ...
+    @typ.overload
+    def __getitem__(self, index:slice) -> tuple[ResourcesArray]: ...
+    
+    def __getitem__(self, index:int|slice):
         return self._data[index]
     
     def __len__(self):
         return len(self._data)
     
-    def __iter__(self):
-        return iter(self._data)
+    def __iter__(self) -> typ.Iterator[ResourcesArray]:
+        yield from self._data
     
     def __contains__(self, value):
         if isinstance(value, ResourcesArray):

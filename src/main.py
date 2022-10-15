@@ -302,8 +302,35 @@ def main():
                     return
                 
                 # case "diff": ... #TODO: Differenciate two lists (maybe more)
-                # case "merge": ... #TODO: Merge two lists (maybe more)
-                # case "clone": ... #TODO: Clone (or copy) a list
+
+                case "merge":
+                    check_selected()
+                    index = check_index(enter[2]) 
+                    if isinstance(index, int):
+                        index = slice(index, index + 1)
+
+                    target = all_lists.selected
+                    
+                    for rarray in all_lists[index]:
+                        if rarray is target:
+                            print(f"Cannot merge the target list into itself. Continuing...")
+                            continue
+                        
+                        print(f'Merging "{rarray.name}" into "{target.name}"...')
+                        target.extend(rarray)
+                    print("Merge finished.")
+
+                case "clone":
+                    index = check_index(enter[2])
+                    if isinstance(index, int):
+                        index = slice(index, index + 1)
+                    
+                    for rarray in all_lists[index]:
+                        rarray_cp = rarray.copy()
+                        rarray_cp.name = f"Copy {all_lists.count_copies(rarray)} of {rarray.name}"
+
+                        all_lists.add(rarray_cp)
+                        print(f'"{rarray.name}" has been cloned.')
                 
                 case ""|None:
                     print("You must use a subcommand also.")
