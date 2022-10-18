@@ -21,8 +21,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from pathlib import Path, PurePath
 from abc import ABC, abstractmethod
 from consoletools import format_delta, format_number, format_size
-import os, logging, sys, pickle, json, zipfile
-import typing as typ, datetime as dt, shutil as sh
+from typing_extensions import Self
+import os
+import logging
+import sys
+import pickle
+import json
+import zipfile
+import typing as typ
+import datetime as dt
+import shutil as sh
 
 __all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR", "ResourcesArray", "all_lists"]
 _AT = typ.TypeVar("_AT")
@@ -705,9 +713,10 @@ class ResourcesArray(typ.Sequence[BackupMeta]):
     def remove(self, value:BackupMeta) -> None:
         self._data.remove(value)
     
-    def extend(self, iter:typ.Iterable[BackupMeta]):
+    def extend(self, iter:typ.Iterable[BackupMeta]) -> Self:
         for i in iter:
             self.add(i)
+        return self
     
     def backup(self, index:int|slice = ..., *, force:bool = False) -> typ.Generator[tuple[bool, BackupMeta], None, None]:
         """
@@ -823,6 +832,20 @@ class ResourcesArray(typ.Sequence[BackupMeta]):
                 "list_name": self.name,
                 "content": [meta.to_dict() for meta in self._data]
             }, fp, indent= 4, )
+            
+    def diff(self, other:Self) -> Self:
+        """
+        Return a `ResourcesArray` that has only the resources that are not in `other`.
+        """
+        smaller, bigger = sorted((self, other), key= len)
+        new = ResourcesArray(f'Diff of "{self.name}" and "{other.name}"')
+        names = set((meta.name for meta in smaller))
+        
+        for rsrc in bigger:
+            if rsrc.name not in names:
+                new.add(rsrc)
+
+        return new
     
     def __iter__(self) -> typ.Iterator[BackupMeta]:
         return iter(self._data)
@@ -838,12 +861,17 @@ class ResourcesArray(typ.Sequence[BackupMeta]):
     
     def __contains__(self, value: object) -> bool:
         if isinstance(value, BackupMeta):
-            return (value._origin, value._destiny) in map(lambda x: (x._origin, x._destiny), self._data)
+            return (value.origin, value.destiny) in map(lambda x: (x.origin, x.destiny), self._data)
 
         return False
     
     def __repr__(self) -> str:
         return type(self).__name__ + f"(name= {self.name})"
+    
+    def __eq__(self, other):
+        if isinstance(other, ResourcesArray):
+            return (self.name, self._data) == (other.name, other._data)
+        return NotImplemented
     
 # Convert PathBackupArrays to ResourcesArrays
 class PathBackupArray(ResourcesArray):
