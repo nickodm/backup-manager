@@ -301,7 +301,23 @@ def main():
                         print("The list was not renamed.")
                     return
                 
-                # case "diff": ... #TODO: Differenciate two lists (maybe more)
+                case "diff":
+                    check_selected()
+                    index = check_index(enter[2])
+                    if isinstance(index, int):
+                        index = slice(index, index + 1)
+                    target = all_lists.selected
+                    
+                    for rarray in all_lists[index]:
+                        if rarray is target:
+                            print("Cannot show differences between the selected list and itself. Continuing...")
+                            continue
+                        
+                        print(f'Showing differences between "{target.name}" and "{rarray.name}":')
+                        for rsrc in target.diff(rarray):
+                            print(rsrc.report())
+                    
+                    print("Diff finished.")
 
                 case "merge":
                     check_selected()
@@ -326,8 +342,7 @@ def main():
                         index = slice(index, index + 1)
                     
                     for rarray in all_lists[index]:
-                        rarray_cp = rarray.copy()
-                        rarray_cp.name = f"Copy {all_lists.count_copies(rarray)} of {rarray.name}"
+                        rarray_cp = rarray.copy(f"Copy {all_lists.count_copies(rarray)} of {rarray.name}")
 
                         all_lists.add(rarray_cp)
                         print(f'"{rarray.name}" has been cloned.')

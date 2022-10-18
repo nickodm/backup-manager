@@ -766,13 +766,17 @@ class ResourcesArray(typ.Sequence[BackupMeta]):
         new._data = list(filter(lambda x: isinstance(x, BackupDir), self._data))
         return new
 
-    def copy(self):
+    def copy(self, name:str = ...) -> Self:
         """
         Return a copy of the array.
         """
-        copy = ResourcesArray(self.name)
-        copy._data = self._data.copy()
-        return copy
+        from copy import copy
+        cp = copy(self)
+
+        if name is not Ellipsis:
+            cp.name = name
+
+        return cp
     
     def save(self, *, path:Path = ...) -> None:
         """
