@@ -21,7 +21,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from pathlib import Path, PurePath
 from abc import ABC, abstractmethod
 from consoletools import format_delta, format_number, format_size
-from typing_extensions import Self
 import os
 import logging
 import sys
@@ -35,8 +34,10 @@ import shutil as sh
 __all__ = ["BackupMeta", "BackupFile", "BackupDir", "PROJECT_DIR", "ResourcesArray", "all_lists"]
 _AT = typ.TypeVar("_AT")
 
-PROJECT_DIR:Path = Path(os.getenv("APPDATA") + "/Nicko's Backup Manager") if sys.platform == "win32" else \
-    Path.home() / ".Nicko's Backup Manager"
+if sys.platform == "win32":
+    PROJECT_DIR = Path(os.getenv("APPDATA")) / "Nicko's Backup Manager"
+else:
+    PROJECT_DIR = Path.home() / ".Nicko's Backup Manager"
 
 class BackupMeta(ABC):
     
@@ -713,7 +714,7 @@ class ResourcesArray(typ.Sequence[BackupMeta]):
     def remove(self, value:BackupMeta) -> None:
         self._data.remove(value)
     
-    def extend(self, iter:typ.Iterable[BackupMeta]) -> Self:
+    def extend(self, iter:typ.Iterable[BackupMeta]) -> typ.Self:
         for i in iter:
             self.add(i)
         return self
@@ -766,7 +767,7 @@ class ResourcesArray(typ.Sequence[BackupMeta]):
         new._data = list(filter(lambda x: isinstance(x, BackupDir), self._data))
         return new
 
-    def copy(self, name:str = ...) -> Self:
+    def copy(self, name:str = ...) -> typ.Self:
         """
         Return a copy of the array.
         """
@@ -837,7 +838,7 @@ class ResourcesArray(typ.Sequence[BackupMeta]):
                 "content": [meta.to_dict() for meta in self._data]
             }, fp, indent= 4, )
             
-    def diff(self, other:Self) -> Self:
+    def diff(self, other:typ.Self) -> typ.Self:
         """
         Return a `ResourcesArray` that has only the resources that are not in `other`.
         """

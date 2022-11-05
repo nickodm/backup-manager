@@ -389,6 +389,20 @@ if __name__ == "__main__":
     init()
     del init
     
+    def init_log() -> None:
+        log_path = PROJECT_DIR.joinpath("logs/Last Log.log")
+        if log_path.exists():
+            from os import remove
+            remove(log_path)
+            
+        logging.basicConfig(filename= log_path, level= logging.INFO, 
+                            format= "[%(asctime)s] %(levelname)s: %(message)s", datefmt= "%b %d, %Y %H:%M:%S")
+
+        logging.info("Starting...")
+        logging.info(f"Working in {platform!r}. \n"
+                     f"Project Dir: '{PROJECT_DIR}'\n"
+                     f"App Version: {__version__}")
+    
     try:
         from sys import platform
         if platform == "win32":    
@@ -399,18 +413,8 @@ if __name__ == "__main__":
             PROJECT_DIR.mkdir()
             PROJECT_DIR.joinpath("logs").mkdir()
             
-        with PROJECT_DIR.joinpath("logs/Last Log.log") as log_path:
-            if log_path.exists():
-                from os import remove
-                remove(log_path)
-                
-            logging.basicConfig(filename= log_path, level= logging.INFO, 
-                                format= "[%(asctime)s] %(levelname)s: %(message)s", datefmt= "%b %d, %Y %H:%M:%S")
-        
-        logging.info("Starting...")
-        logging.info(f"Working in {platform!r}. \n"
-                     f"Project Dir: '{PROJECT_DIR}'\n"
-                     f"App Version: {__version__}")
+        init_log()
+        del init_log
         
         print(
 """Nicko's Backup Manager  Copyright (C) 2022  Nicolás Miranda
