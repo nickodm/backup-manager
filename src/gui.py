@@ -8,6 +8,41 @@ import typing as typ
 __version__ = "0.4.0 (BETA)"
 PROJECT_NAME = "Nicko's Backup Manager (BETA)"
 
+class Button(tk.Button):
+    def __init__(self, master: tk.Misc, text: str = '', 
+                 command: typ.Callable = None, 
+                 state: typ.Literal['normal', 'disabled'] = 'normal', **kw):
+        if command is None:
+            command = lambda: print(f'BUTTON {text!r} PRESSED.')
+        
+        super().__init__(master, text=text, command=command, **kw)
+
+        self.cursor = 'hand2' if state == 'normal' else 'arrow'
+
+    @property
+    def state(self) -> typ.Literal['active', 'normal', 'disabled']:
+        return self['state']
+
+    @state.setter
+    def state(self, val):
+        self['state'] = val
+        
+    @property
+    def cursor(self):
+        return self['cursor']
+    
+    @cursor.setter
+    def cursor(self, val):
+        self['cursor'] = val
+        
+    def enable(self) -> typ.Self:
+        self.config(state='normal', cursor='hand2')
+        return self
+    
+    def disable(self) -> typ.Self:
+        self.config(state='disabled', cursor='arrow')
+        return self        
+
 class ResourcesTable(ttk.Treeview):
     def __init__(self, master, *args, **kw):
         super().__init__(master, *args, **kw)
@@ -83,41 +118,37 @@ def main():
         sticky='nswe',padx=6, pady=6)
 
     # Add File
-    button_add_file = tk.Button(frame_buttons, text='Add File',
-                                command=lambda: print('Add File'))
+    button_add_file = Button(frame_buttons, text='Add File')
     button_add_file.grid(row=0, column=0)
 
     # Add Dir
-    button_add_dir = tk.Button(frame_buttons, text='Add Dir',
-                               command=lambda: print('Add Dir'))
+    button_add_dir = Button(frame_buttons, text='Add Dir')
     button_add_dir.grid(row=0, column=1)
     
     grid_sep(row=0, column=2)
     
     # Edit Resource
-    button_edit_resource = tk.Button(frame_buttons, text='Edit',
-                                     command= lambda: print('Edit Resource'))
+    button_edit_resource = Button(frame_buttons, text='Edit')
     button_edit_resource.grid(row=0, column=3)
 
     # Delete Resource
-    button_del = tk.Button(frame_buttons, text='Delete',
-                           command=lambda: print('Delete Resource'))
+    button_del = Button(frame_buttons, text='Delete')
     button_del.grid(row=0, column=5)
     
     grid_sep(row=0, column=6)
     
-    button_backup = tk.Button(frame_buttons, text='Backup')
+    button_backup = Button(frame_buttons, text='Backup')
     button_backup.grid(row=0, column=7)
 
-    button_restore = tk.Button(frame_buttons, text='Restore')
+    button_restore = Button(frame_buttons, text='Restore')
     button_restore.grid(row=0, column=8)
 
-    button_restore = tk.Button(frame_buttons, text='Copy')
+    button_restore = Button(frame_buttons, text='Copy')
     button_restore.grid(row=0, column=9)
 
     grid_sep(row=0, column=10)
     
-    button_select_all = tk.Button(frame_buttons, text='Select All')
+    button_select_all = Button(frame_buttons, text='Select All')
     button_select_all.grid(row=0, column=11)
 
     grid_sep(row=0, column=12)
