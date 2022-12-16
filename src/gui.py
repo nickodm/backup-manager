@@ -118,20 +118,43 @@ class Button(tk.Button):
 class ResourcesTable(ttk.Treeview):
     def __init__(self, master, *args, **kw):
         super().__init__(master, *args, **kw)
-        self['columns'] = ('ID', 'Origin Path', 'Destiny Path',
-                           'Type')
         
-        self.column('#0', width=0, stretch=tk.NO)
-        self.column('ID', width=50, anchor=tk.CENTER)
-        self.column('Origin Path', width=400, anchor=tk.W)
-        self.column('Destiny Path', width=400, anchor=tk.W)
-        self.column('Type', width=60, anchor=tk.CENTER)
-        # self.column('Compress', width=80, anchor=tk.CENTER)
+        self.column('#0', width=0, stretch=False)
         
-        for column in self['columns']:
-            self.heading(column, text=column, anchor=tk.CENTER)
+        headings = {
+            'ID': {
+                'width': 50,
+                'anchor': tk.CENTER
+            },
+            'Type': {
+                'width': 60,
+                'anchor': tk.CENTER
+            },
+            'Origin Path': {
+                'width': 440,
+                'anchor': tk.W
+            },
+            'Destiny Path': {
+                'width': 440,
+                'anchor': tk.W
+            }
+        }
+        
+        self['columns'] = list(headings.keys())
+        for name, data in headings.items():
+            self.column(name, stretch=False, **data)
+            self.heading(name, text=name, anchor=data['anchor'])
 
         self._array: ResourcesArray | None = None
+        
+        self.scrollbar_x = ttk.Scrollbar(master, orient='horizontal',
+                                         command=self.xview)
+        self.scrollbar_x.grid(row=1, column=0, sticky='we')
+        self.scrollbar_y = ttk.Scrollbar(master, command=self.yview)
+        self.scrollbar_y.grid(row=0, column=1, sticky='ns')
+        
+        self.config(xscrollcommand=self.scrollbar_x.set,
+                    yscrollcommand=self.scrollbar_y.set)
     
     @property
     def array(self) -> ResourcesArray | None:
@@ -146,9 +169,12 @@ class ResourcesTable(ttk.Treeview):
     def insert(self, meta: BackupMeta) -> BackupMeta:
         """Insert a resource in the view. JUST FOR RESOURCES IN THE ARRAY."""
         id = str(self.array.index(meta))
+        print(len(str(meta.origin)))
         super().insert('', 'end', iid=id, 
-                       values=(id, meta.origin, meta.destiny, 
-                               meta.type.upper()))
+                       values=(id, 
+                               meta.type.upper(), 
+                               meta.origin, 
+                               meta.destiny))
         return meta
         
     def reload(self) -> typ.Self:
