@@ -1,4 +1,5 @@
 from models import *
+from pathlib import Path
 import tkinter as tk
 from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
@@ -98,17 +99,89 @@ class ResourcesTable(ttk.Treeview):
     
     @array.setter
     def array(self, array: ResourcesArray):
+        self._array = array
         for rsrc in array:
-            id = str(array.index(rsrc))
-            super().insert(parent='',
-                           index='end',
-                           iid=id,
-                           values=(id, 
-                                   rsrc.origin, 
-                                   rsrc.destiny, 
-                                   rsrc.type.upper()))
+            self.insert(rsrc)
+       
+    def insert(self, meta: BackupMeta) -> BackupMeta:
+        """Insert a resource in the view. JUST FOR RESOURCES IN THE ARRAY."""
+        id = str(self.array.index(meta))
+        super().insert('', 'end', iid=id, 
+                       values=(id, meta.origin, meta.destiny, 
+                               meta.type.upper()))
+        return meta
+        
+    def reload(self) -> typ.Self:
+        self.clear()
+        self.array = self.array
+        return self
     
-        self._array = array    
+    def clear(self) -> typ.Self:
+        self.delete(*range(len(all_lists)))
+        return self
+        
+    def add_file(self):
+        origin = tkFd.askopenfilename(
+            title= "Backup File",
+            filetypes= (
+                ("Any File", "*.*"), 
+            )
+        )
+
+        if not origin:
+            return
+
+        origin = Path(origin).resolve(strict= True)
+
+        destiny = Path(tkFd.asksaveasfilename(
+            title= "Backup File Destiny",
+            initialfile= "[BACKUP] " + origin.name,
+            defaultextension= origin.suffix,
+            filetypes= (("*" + origin.suffix, origin.suffix), 
+            )
+        ))
+
+        if not destiny:
+            return
+        
+        destiny = Path(destiny).resolve()
+        
+        new = BackupFile(origin, destiny)
+        self.array.add(new)
+        self.reload() #TODO: Optimize this
+        
+        return new
+
+    def get_dir(*, zip_file:bool = False): #TODO
+        origin = tkFd.askdirectory(
+            title= "Backup Dir",
+            mustexist= True
+        )
+
+        if not origin:
+            return
+        
+        origin = Path(origin).resolve(strict= True)
+
+        if zip_file:
+            destiny = tkFd.asksaveasfilename(
+                title= "Backup Dir Destiny",
+                filetypes= (("Archivo ZIP", "*.zip"), ),
+                defaultextension= "*.zip",
+                initialfile= " [BACKUP] " + origin.name
+            )
+        else:
+            destiny = tkFd.askdirectory(
+                    title= "Backup Dir Destiny",
+                    mustexist= False,
+                    initialdir= " [BACKUP] " + origin.name
+                )
+            
+        if not destiny:
+            return
+        
+        destiny = Path(destiny).resolve()
+        
 
 def main():
     def grid_sep(master: tk.Misc, *, row: int, column: int, 
@@ -120,6 +193,7 @@ def main():
         
     def export_log(): 
         path = tkFd.asksaveasfilename(
+            title='Save Log',
             parent=root,
             confirmoverwrite=True,
             defaultextension='*.txt',
@@ -253,6 +327,8 @@ def main():
     # table_resources['columns'] = ('ID', 'Origin Path', 'Destiny Path',
     #                               'Type', 'Compress')
     table_resources.array = all_lists[0]
+    
+    button_add_file.config(command=table_resources.add_file)
     # table_resources.column('#0', width=0, stretch=tk.NO)
     # table_resources.column('ID', width=50, anchor=tk.CENTER)
     # table_resources.column('Origin Path', width=200, anchor=tk.CENTER)
@@ -268,9 +344,6 @@ def main():
     #                        iid=str(i))
     
     table_resources.grid(row=0, column=0)
-    
-    
-    button_add_file.config(command=lambda: print(table_resources.selection()))
     
     #****************
     #*   LOAD BAR
