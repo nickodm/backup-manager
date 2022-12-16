@@ -248,6 +248,12 @@ class ResourcesTable(ttk.Treeview):
         
         destiny = Path(destiny).resolve()
         
+    def button_delete(self):
+        for i in self.selection():
+            for j in self.array.pop(int(i)):
+                pass
+            self.delete(i)
+        
 
 def main():
     def grid_sep(master: tk.Misc, *, row: int, column: int, 
@@ -398,6 +404,7 @@ def main():
     table_resources.array = all_lists[0]
     
     button_add_file.config(command=table_resources.add_file)
+    button_del.config(command=table_resources.button_delete)
     
     @listener.add
     def activate_edit_delete_buttons():
