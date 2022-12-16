@@ -105,8 +105,16 @@ class ResourcesTable(ttk.Treeview):
         self._array = array    
 
 def main():
+    def grid_sep(master: tk.Misc, *, row: int, column: int, 
+                 orient: typ.Literal['horizontal', 'vertical']) -> None: 
+        ttk.Separator(master, orient=orient).grid(row=row, 
+                                                      column=column,
+                                                      sticky='nswe', 
+                                                      padx=6, pady=6)
+    
     root = tk.Tk()
     root.title(PROJECT_NAME)
+    root.resizable(False, False)
     
     #****************
     #*     MENU
@@ -129,20 +137,21 @@ def main():
     
     frame_buttons = tk.Frame(root, padx=10, pady=10)
     frame_buttons.grid(row=0, column=0, sticky='w')
-
+    
     frame_lists = tk.Frame(root, padx=10, pady=10)
     frame_lists.grid(row=1, column=0)
     
+    grid_sep(root, row=2, column=0, orient=tk.HORIZONTAL)
+    
+    frame_load_bar = tk.Frame(root, padx=10, pady=10)
+    frame_load_bar.grid(row=3, column=0, sticky=tk.W)
+    
     frame_log = tk.Frame(root, padx=10, pady=10)
-    frame_log.grid(row=2, column=0)
+    frame_log.grid(row=4, column=0)
     
     #****************
     #*    BUTTONS
     #****************
-    def grid_sep(*, row: int, column: int) -> None: 
-        ttk.Separator(frame_buttons, orient='vertical') \
-        .grid(row=row, column=column,
-        sticky='nswe',padx=6, pady=6)
 
     # Add File
     button_add_file = Button(frame_buttons, text='Add File')
@@ -152,7 +161,7 @@ def main():
     button_add_dir = Button(frame_buttons, text='Add Dir')
     button_add_dir.grid(row=0, column=1)
     
-    grid_sep(row=0, column=2)
+    grid_sep(frame_buttons, row=0, column=2, orient='vertical')
     
     # Edit Resource
     button_edit_resource = Button(frame_buttons, text='Edit')
@@ -162,7 +171,7 @@ def main():
     button_del = Button(frame_buttons, text='Delete')
     button_del.grid(row=0, column=5)
     
-    grid_sep(row=0, column=6)
+    grid_sep(frame_buttons, row=0, column=6, orient='vertical')
     
     button_backup = Button(frame_buttons, text='Backup')
     button_backup.grid(row=0, column=7)
@@ -173,12 +182,12 @@ def main():
     button_restore = Button(frame_buttons, text='Copy')
     button_restore.grid(row=0, column=9)
 
-    grid_sep(row=0, column=10)
+    grid_sep(frame_buttons, row=0, column=10, orient='vertical')
     
     button_select_all = Button(frame_buttons, text='Select All')
     button_select_all.grid(row=0, column=11)
 
-    grid_sep(row=0, column=12)
+    grid_sep(frame_buttons, row=0, column=12, orient='vertical')
     
     select_list = ttk.Combobox(frame_buttons)
     select_list.config(values=[i.name for i in all_lists])
@@ -219,10 +228,18 @@ def main():
     button_add_file.config(command=lambda: print(table_resources.selection()))
     
     #****************
+    #*   LOAD BAR
+    #****************
+
+    pbar = ttk.Progressbar(frame_load_bar, length=910)
+    pbar.grid(row=0, column=0)
+
+    #****************
     #*    LOGS
     #****************
     
     log_space = LogSpace(frame_log, height=10, width=89).disable()
+    log_space.write("Welcome to the software!")
     log_space.grid(row=0, column=0)
     
     root.mainloop()
