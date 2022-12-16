@@ -384,7 +384,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
         case _:
             print("Unknown command")
 
-if __name__ == "__main__":
+def run():
     from colorama import init
     init()
     del init
@@ -400,8 +400,8 @@ if __name__ == "__main__":
 
         logging.info("Starting...")
         logging.info(f"Working in {platform!r}. \n"
-                     f"Project Dir: '{PROJECT_DIR}'\n"
-                     f"App Version: {__version__}")
+                    f"Project Dir: '{PROJECT_DIR}'\n"
+                    f"App Version: {__version__}")
     
     try:
         from sys import platform
@@ -441,3 +441,6 @@ under certain conditions; type 'license' for details.
             raise
         logging.exception(exc)
         print(f'An error has ocurred: {exc!r}.\nPlease report it on "github.com/nickodm/backup-manager".')
+
+if __name__ == "__main__":
+    run()

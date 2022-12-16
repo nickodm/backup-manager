@@ -20,18 +20,18 @@ class LogSpace(ScrolledText):
         
         return len(string)
     
-    def clear(self) -> typ.Self:
+    def clear(self):
         old_state = self['state']
         self['state'] = 'normal'
         self.delete('0.0', tk.END)
         self['state'] = old_state
         return self
         
-    def enable(self) -> typ.Self:
+    def enable(self):
         self['state'] = tk.NORMAL
         return self
     
-    def disable(self) -> typ.Self:
+    def disable(self):
         self['state'] = tk.DISABLED
         return self
     
@@ -66,11 +66,11 @@ class Button(tk.Button):
     def cursor(self, val):
         self['cursor'] = val
         
-    def enable(self) -> typ.Self:
+    def enable(self):
         self.config(state='normal', cursor='hand2')
         return self
     
-    def disable(self) -> typ.Self:
+    def disable(self):
         self.config(state='disabled', cursor='arrow')
         return self        
 
@@ -143,6 +143,13 @@ def main():
         from webbrowser import open
         open('https://github.com/nickodm/backup-manager')
         
+    def use_command_prompt():
+        from main import run
+        if tkMsg.askokcancel(PROJECT_NAME,
+                          "The graphic interface will close. Are you sure?"):
+            root.destroy()
+            run()
+            
     
     root = tk.Tk()
     root.title(PROJECT_NAME)
@@ -154,6 +161,9 @@ def main():
     
     menu_main = tk.Menu(root)
     root.config(menu=menu_main)
+    
+    menu_main.add_command(label='Use Command Prompt',
+                          command=use_command_prompt)
 
     menu_main.add_command(label='GitHub',
                           command=open_github)
@@ -298,7 +308,7 @@ if __name__ == "__main__":
     try:
         main()
     except BaseException as exc:
-        if isinstance(exc, KeyboardInterrupt):
+        if isinstance(exc, (KeyboardInterrupt, SystemExit)):
             raise
         
         tkMsg.showerror(PROJECT_NAME,
