@@ -2,6 +2,7 @@ from models import *
 import tkinter as tk
 from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
+import tkinter.filedialog as tkFd
 import tkinter.messagebox as tkMsg
 import sys
 import typing as typ
@@ -10,10 +11,11 @@ __version__ = "0.4.0 (BETA)"
 PROJECT_NAME = "Nicko's Backup Manager (BETA)"
 
 class LogSpace(ScrolledText):
-    def write(self, string: str, index: str = tk.END):
+    def write(self, string: str, 
+              index: str = tk.END, endline: str = "\n"):
         old_state = self['state']
         self['state'] = 'normal'
-        self.insert(index, string)
+        self.insert(index, string + endline)
         self['state'] = old_state
         
         return len(string)
@@ -32,6 +34,10 @@ class LogSpace(ScrolledText):
     def disable(self) -> typ.Self:
         self['state'] = tk.DISABLED
         return self
+    
+    def get(self, start: str = "0.0", end: str = tk.END) -> str:
+        return super().get(start, end)
+
 
 class Button(tk.Button):
     def __init__(self, master: tk.Misc, text: str = '', 
@@ -111,6 +117,27 @@ def main():
                                                       column=column,
                                                       sticky='nswe', 
                                                       padx=6, pady=6)
+        
+    def export_log(): 
+        path = tkFd.asksaveasfilename(
+            parent=root,
+            confirmoverwrite=True,
+            defaultextension='*.txt',
+            filetypes=[
+                ('Text File', '*.txt')
+            ]
+        )
+        
+        if not path:            
+            return
+        
+        log_space.write("Exporting log...")
+        with open(path, 'w', encoding='utf-8') as fp:
+            fp.write(log_space.get())
+            
+        log_space.write('Log exported!')
+        tkMsg.showinfo(PROJECT_NAME,
+                       "Your log was exported!")
     
     root = tk.Tk()
     root.title(PROJECT_NAME)
@@ -242,7 +269,7 @@ def main():
     #****************
     
     log_space = LogSpace(frame_log, height=10, width=89).disable()
-    log_space.write("Welcome to the software!")
+    log_space.write("Welcome to the software!")    
     log_space.grid(row=0, column=0)
     
     #* BUTTONS
@@ -250,7 +277,8 @@ def main():
                                  command=log_space.clear)
     log_button_clear.grid(row=0, column=0)
     
-    log_button_export = Button(frame_log_buttons, text='Export')
+    log_button_export = Button(frame_log_buttons, text='Export',
+                               command=export_log)
     log_button_export.grid(row=0, column=1)
     
     root.mainloop()
