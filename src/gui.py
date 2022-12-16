@@ -138,6 +138,11 @@ def main():
         log_space.write('Log exported!')
         tkMsg.showinfo(PROJECT_NAME,
                        "Your log was exported!")
+        
+    def open_github():
+        from webbrowser import open
+        open('https://github.com/nickodm/backup-manager')
+        
     
     root = tk.Tk()
     root.title(PROJECT_NAME)
@@ -148,15 +153,15 @@ def main():
     #****************
     
     menu_main = tk.Menu(root)
+    root.config(menu=menu_main)
 
+    menu_main.add_command(label='GitHub',
+                          command=open_github)
     
     menu_main.add_command(label='About',
                           command=lambda: tkMsg.showinfo(
                             PROJECT_NAME,
                             f"v{__version__}"))
-
-    
-    root.config(menu=menu_main)
     
     #****************
     #*    FRAMES
