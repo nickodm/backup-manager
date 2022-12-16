@@ -214,8 +214,10 @@ def main():
                        "Your log was exported!")
         
     def open_github():
-        from webbrowser import open
-        open('https://github.com/nickodm/backup-manager')
+        if tkMsg.askokcancel(PROJECT_NAME,
+                             'The web browser will open.'):        
+            from webbrowser import open
+            open('https://github.com/nickodm/backup-manager')
         
     def use_command_prompt():
         from main import run
@@ -324,24 +326,9 @@ def main():
     # table_resources_y_scroll.grid(row=1, column=0)
     
     table_resources = ResourcesTable(frame_lists)
-    # table_resources['columns'] = ('ID', 'Origin Path', 'Destiny Path',
-    #                               'Type', 'Compress')
     table_resources.array = all_lists[0]
     
     button_add_file.config(command=table_resources.add_file)
-    # table_resources.column('#0', width=0, stretch=tk.NO)
-    # table_resources.column('ID', width=50, anchor=tk.CENTER)
-    # table_resources.column('Origin Path', width=200, anchor=tk.CENTER)
-    # table_resources.column('Destiny Path', width=200, anchor=tk.CENTER)
-    # table_resources.column('Type', width=60, anchor=tk.CENTER)
-    # table_resources.column('Compress', width=80, anchor=tk.CENTER)
-    
-    # for column in table_resources['columns']:
-    #     table_resources.heading(column, text=column, anchor=tk.CENTER)
-    
-    # for i in range(4):
-    #     table_resources.insert('', 'end', values=(str(i), 'a', 'b', 'FILE', 'Yes'),
-    #                        iid=str(i))
     
     table_resources.grid(row=0, column=0)
     
