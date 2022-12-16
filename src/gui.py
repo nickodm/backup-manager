@@ -3,6 +3,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
+from threading import Thread
+from time import sleep
 import tkinter.filedialog as tkFd
 import tkinter.messagebox as tkMsg
 import sys
@@ -10,6 +12,43 @@ import typing as typ
 
 __version__ = "0.4.0 (BETA)"
 PROJECT_NAME = "Nicko's Backup Manager (BETA)"
+
+class Listener:
+    def __init__(self) -> None:
+        self.interval: int | float = 0.2
+        self.thread: Thread = Thread(daemon=True, target=self.__main)
+        self.__funcs: set[typ.Callable] = set()
+        self.__stop = False
+        
+    @property
+    def working(self) -> bool:
+        return self.thread.is_alive()
+    
+    def add(self, func: typ.Callable):
+        self.__funcs.add(func)
+        return func
+    
+    def start(self) -> typ.Self:
+        if not self.working:
+            self.thread.start()
+        return self
+    
+    def stop(self) -> typ.Self:
+        self.__stop = True
+        self.thread.join()
+        return self
+    
+    def __main(self):
+        while not self.__stop:
+            for func in self.__funcs:
+                if self.__stop:
+                    self.__stop = False
+                    return
+                
+                func()
+                sleep(self.interval)
+            sleep(self.interval)
+            
 
 class LogSpace(ScrolledText):
     def write(self, string: str, 
@@ -73,7 +112,8 @@ class Button(tk.Button):
     
     def disable(self):
         self.config(state='disabled', cursor='arrow')
-        return self        
+        return self
+
 
 class ResourcesTable(ttk.Treeview):
     def __init__(self, master, *args, **kw):
@@ -223,6 +263,7 @@ def main():
         from main import run
         if tkMsg.askokcancel(PROJECT_NAME,
                           "The graphic interface will close. Are you sure?"):
+            listener.stop()
             root.destroy()
             run()
             
@@ -230,6 +271,8 @@ def main():
     root = tk.Tk()
     root.title(PROJECT_NAME)
     root.resizable(False, False)
+    
+    listener = Listener()
     
     #****************
     #*     MENU
@@ -330,6 +373,15 @@ def main():
     
     button_add_file.config(command=table_resources.add_file)
     
+    @listener.add
+    def activate_edit_delete_buttons():
+        if table_resources.selection():
+            button_edit_resource.enable()
+            button_del.enable()
+        else:
+            button_edit_resource.disable()
+            button_del.disable()
+    
     table_resources.grid(row=0, column=0)
     
     #****************
@@ -356,6 +408,7 @@ def main():
                                command=export_log)
     log_button_export.grid(row=0, column=1)
     
+    listener.start()
     root.mainloop()
 
 if __name__ == "__main__":
