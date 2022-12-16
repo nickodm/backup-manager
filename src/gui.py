@@ -149,6 +149,9 @@ def main():
     frame_log = tk.Frame(root, padx=10, pady=10)
     frame_log.grid(row=4, column=0)
     
+    frame_log_buttons = tk.Frame(root, padx=10, pady=10)
+    frame_log_buttons.grid(row=5, column=0, sticky=tk.W)
+    
     #****************
     #*    BUTTONS
     #****************
@@ -241,6 +244,14 @@ def main():
     log_space = LogSpace(frame_log, height=10, width=89).disable()
     log_space.write("Welcome to the software!")
     log_space.grid(row=0, column=0)
+    
+    #* BUTTONS
+    log_button_clear = Button(frame_log_buttons, text='Clear',
+                                 command=log_space.clear)
+    log_button_clear.grid(row=0, column=0)
+    
+    log_button_export = Button(frame_log_buttons, text='Export')
+    log_button_export.grid(row=0, column=1)
     
     root.mainloop()
 
