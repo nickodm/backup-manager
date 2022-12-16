@@ -1,12 +1,37 @@
 from models import *
 import tkinter as tk
 from tkinter import ttk
+from tkinter.scrolledtext import ScrolledText
 import tkinter.messagebox as tkMsg
 import sys
 import typing as typ
 
 __version__ = "0.4.0 (BETA)"
 PROJECT_NAME = "Nicko's Backup Manager (BETA)"
+
+class LogSpace(ScrolledText):
+    def write(self, string: str, index: str = tk.END):
+        old_state = self['state']
+        self['state'] = 'normal'
+        self.insert(index, string)
+        self['state'] = old_state
+        
+        return len(string)
+    
+    def clear(self) -> typ.Self:
+        old_state = self['state']
+        self['state'] = 'normal'
+        self.delete('0.0', tk.END)
+        self['state'] = old_state
+        return self
+        
+    def enable(self) -> typ.Self:
+        self['state'] = tk.NORMAL
+        return self
+    
+    def disable(self) -> typ.Self:
+        self['state'] = tk.DISABLED
+        return self
 
 class Button(tk.Button):
     def __init__(self, master: tk.Misc, text: str = '', 
@@ -105,9 +130,11 @@ def main():
     frame_buttons = tk.Frame(root, padx=10, pady=10)
     frame_buttons.grid(row=0, column=0, sticky='w')
 
-    
     frame_lists = tk.Frame(root, padx=10, pady=10)
     frame_lists.grid(row=1, column=0)
+    
+    frame_log = tk.Frame(root, padx=10, pady=10)
+    frame_log.grid(row=2, column=0)
     
     #****************
     #*    BUTTONS
@@ -191,7 +218,12 @@ def main():
     
     button_add_file.config(command=lambda: print(table_resources.selection()))
     
-    ttk.Combobox # Lista desplegable
+    #****************
+    #*    LOGS
+    #****************
+    
+    log_space = LogSpace(frame_log, height=10, width=89).disable()
+    log_space.grid(row=0, column=0)
     
     root.mainloop()
 
@@ -205,6 +237,9 @@ if __name__ == "__main__":
     try:
         main()
     except BaseException as exc:
+        if isinstance(exc, KeyboardInterrupt):
+            raise
+        
         tkMsg.showerror(PROJECT_NAME,
                         f"An error has ocurred: {exc!r}.\n"
                          "The software will close now.")
