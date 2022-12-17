@@ -1,4 +1,5 @@
 from models import *
+from keyboard import add_hotkey
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk
@@ -65,7 +66,6 @@ class Listener:
     
     def run(self):
         "Call all the functions periodically."
-        print('que')
         if self._stop:
             return
 
@@ -287,6 +287,10 @@ class ResourcesTable(ttk.Treeview):
             for j in self.array.pop(int(i)):
                 pass
             self.delete(i)
+            
+    def select_all(self) -> typ.Self:
+        self.selection_add([i for i in range(len(self.array))])
+        return self
         
 
 def main():
@@ -429,19 +433,15 @@ def main():
     #****************
     #*    TABLE
     #****************
-    
-    #* Scrollbars
-    # table_resources_x_scroll = tk.Scrollbar(frame_lists)
-    # table_resources_x_scroll.grid(row=0, column=1)
-    
-    # table_resources_y_scroll = tk.Scrollbar(frame_lists, orient='horizontal')
-    # table_resources_y_scroll.grid(row=1, column=0)
-    
+        
     table_resources = ResourcesTable(frame_lists)
     table_resources.array = all_lists[0]
     
     button_add_file.config(command=table_resources.add_file)
     button_del.config(command=table_resources.button_delete)
+    button_select_all.config(command=table_resources.select_all)
+    
+    add_hotkey('ctrl+a', table_resources.select_all)
     
     @listener.add
     def activate_edit_delete_buttons():
