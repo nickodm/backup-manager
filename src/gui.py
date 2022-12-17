@@ -377,7 +377,7 @@ def main():
     menu_options.add_separator()
     
     menu_options.add_command(label='Save Lists and Resources',
-                             command=lambda: (all_lists.save,
+                             command=lambda: (all_lists.save(),
                                               log_space.write(
                                                   'Saved lists and resources!'
                                               )))
@@ -521,6 +521,30 @@ def main():
     
     table_resources.bind('<<TreeviewSelect>>', 
                          lambda x: activate_edit_delete_buttons())
+    
+    def down_key(): #TODO: Support Shift + arrow
+        if not table_resources.selection():
+            return table_resources.selection_set(0)
+        
+        n = int(table_resources.selection()[0]) + 1
+        if n == len(table_resources.array):
+            return table_resources.selection_set(0)
+            
+        table_resources.selection_set(n)
+    
+    add_hotkey('down', down_key)
+    
+    def up_key():
+        if not table_resources.selection():
+            return table_resources.selection_set(len(table_resources.array) - 1)
+        
+        n = int(table_resources.selection()[0]) - 1
+        if n == -1:
+            return table_resources.selection_set(len(table_resources.array) - 1)
+            
+        table_resources.selection_set(n)
+        
+    add_hotkey('up', up_key)
     
     table_resources.grid(row=0, column=0)
     
