@@ -15,39 +15,73 @@ PROJECT_NAME = "Nicko's Backup Manager (BETA)"
 
 class Listener:
     def __init__(self) -> None:
-        self.interval: int | float = 0.2
-        self.thread: Thread = Thread(daemon=True, target=self.__main)
-        self.__funcs: set[typ.Callable] = set()
-        self.__stop = False
+        self.interval: int | float = .08
+        self.thread: Thread = Thread(daemon=True, target=self.run)
+        self._funcs: set[typ.Callable] = set()
+        self._stop = False
+        self._paused = False
         
     @property
     def working(self) -> bool:
+        "Whether the thread is active."
         return self.thread.is_alive()
     
+    @property
+    def paused(self) -> bool:
+        "Whether the activity is paused or not."
+        return self._paused
+    
     def add(self, func: typ.Callable):
-        self.__funcs.add(func)
+        "Add an object to be called periodically."
+        self._funcs.add(func)
+        return func
+    
+    def remove(self, func: typ.Callable):
+        "Remove an object."
+        self._funcs.remove(func)
         return func
     
     def start(self) -> typ.Self:
+        "Start the activity and the thread."
         if not self.working:
             self.thread.start()
         return self
     
     def stop(self) -> typ.Self:
-        self.__stop = True
-        self.thread.join()
+        "Stop the activity and join the thread."
+        self._stop = True
+        self.thread.join(self.interval * 2)
         return self
     
-    def __main(self):
-        while not self.__stop:
-            for func in self.__funcs:
-                if self.__stop:
-                    self.__stop = False
-                    return
-                
-                func()
+    def pause(self) -> typ.Self:
+        "Pause the activity, but keep the thread alive."
+        self._paused = True
+        return self
+    
+    def resume(self) -> typ.Self:
+        "Resume the activity."
+        self._paused = False
+        return self
+    
+    def run(self):
+        "Call all the functions periodically."
+        print('que')
+        if self._stop:
+            return
+
+        for func in self._funcs:
+            if self._stop:
+                self._stop = False
+                return
+
+            while self._paused:
                 sleep(self.interval)
+            
+            func()
             sleep(self.interval)
+        sleep(self.interval)
+        
+        self.run()
             
 
 class LogSpace(ScrolledText):
@@ -306,6 +340,9 @@ def main():
     
     listener = Listener()
     
+    root.bind('<Map>', lambda x: listener.resume())
+    root.bind('<Unmap>', lambda x: listener.pause())
+    
     #****************
     #*     MENU
     #****************
@@ -337,13 +374,13 @@ def main():
     grid_sep(root, row=2, column=0, orient=tk.HORIZONTAL)
     
     frame_load_bar = tk.Frame(root, padx=10, pady=10)
-    frame_load_bar.grid(row=3, column=0, sticky=tk.W)
+    frame_load_bar.grid(row=3, column=0, sticky='we')
     
     frame_log = tk.Frame(root, padx=10, pady=10)
     frame_log.grid(row=4, column=0)
     
     frame_log_buttons = tk.Frame(root, padx=10, pady=10)
-    frame_log_buttons.grid(row=5, column=0, sticky=tk.W)
+    frame_log_buttons.grid(row=5, column=0, sticky='we')
     
     #****************
     #*    BUTTONS
