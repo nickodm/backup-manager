@@ -203,7 +203,6 @@ class ResourcesTable(ttk.Treeview):
     def insert(self, meta: BackupMeta) -> BackupMeta:
         """Insert a resource in the view. JUST FOR RESOURCES IN THE ARRAY."""
         id = str(self.array.index(meta))
-        print(len(str(meta.origin)))
         super().insert('', 'end', iid=id, 
                        values=(id, 
                                meta.type.upper(), 
@@ -322,12 +321,15 @@ def main():
         log_space.write('Log exported!')
         tkMsg.showinfo(PROJECT_NAME,
                        "Your log was exported!")
-        
-    def open_github():
+    
+    def open_web_browser(url: str):
         if tkMsg.askokcancel(PROJECT_NAME,
                              'The web browser will open.'):        
             from webbrowser import open
-            open('https://github.com/nickodm/backup-manager')
+            open(url)
+            return True
+        else:
+            return False
         
     def use_command_prompt():
         from main import run
@@ -358,7 +360,15 @@ def main():
                           command=use_command_prompt)
 
     menu_main.add_command(label='GitHub',
-                          command=open_github)
+                          command= lambda: open_web_browser(
+                              'https://github.com/nickodm/backup-manager'
+                          ))
+    
+    menu_main.add_command(
+        label='License',
+        command= lambda: open_web_browser(
+        "https://github.com/nickodm/backup-manager/blob/master/COPYING"
+        ))
     
     menu_main.add_command(label='About',
                           command=lambda: tkMsg.showinfo(
