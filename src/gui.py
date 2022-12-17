@@ -290,7 +290,11 @@ class ResourcesTable(ttk.Treeview):
     def select_all(self) -> typ.Self:
         self.selection_add([i for i in range(len(self.array))])
         return self
-        
+    
+    def unselect_all(self) -> typ.Self:
+        self.selection_remove([i for i in range(len(self.array))])
+        return self
+    
 
 def main():
     def grid_sep(master: tk.Misc, *, row: int, column: int, 
@@ -451,11 +455,11 @@ def main():
     grid_sep(frame_buttons, row=0, column=3, orient='vertical')
     
     # Edit Resource
-    button_edit = Button(frame_buttons, text='Edit')
+    button_edit = Button(frame_buttons, text='Edit').disable()
     button_edit.grid(row=0, column=4)
 
     # Delete Resource
-    button_del = Button(frame_buttons, text='Delete')
+    button_del = Button(frame_buttons, text='Delete').disable()
     button_del.grid(row=0, column=5)
     
     grid_sep(frame_buttons, row=0, column=6, orient='vertical')
@@ -491,18 +495,32 @@ def main():
     
     button_add_file.config(command=table_resources.add_file)
     button_del.config(command=table_resources.button_delete)
-    button_select_all.config(command=table_resources.select_all)
     
-    add_hotkey('ctrl+a', table_resources.select_all)
+    def button_select_all_command():
+        if len(table_resources.selection()) == len(table_resources.array):
+            table_resources.unselect_all()
+        else:
+            table_resources.select_all()
+            
+    button_select_all.config(command=button_select_all_command)
     
-    @listener.add
+    add_hotkey('ctrl+a', button_select_all.invoke)
+    
+    # @listener.add
     def activate_edit_delete_buttons():
-        if table_resources.selection():
+        selection_len = len(table_resources.selection())
+        if selection_len == 1:
             button_edit.enable()
-            button_del.enable()
         else:
             button_edit.disable()
+            
+        if selection_len:
+            button_del.enable()
+        else:
             button_del.disable()
+    
+    table_resources.bind('<<TreeviewSelect>>', 
+                         lambda x: activate_edit_delete_buttons())
     
     table_resources.grid(row=0, column=0)
     
@@ -518,7 +536,11 @@ def main():
     #****************
     
     log_space = LogSpace(frame_log, height=10, width=89).disable()
-    log_space.write("Welcome to the software!")    
+    log_space.write("Welcome to the software!")
+    log_space.write(
+        "Press and hold CTRL or SHIFT (minus) key to select more than one "
+        "file or dir.")
+    log_space.write("-"*72)
     log_space.grid(row=0, column=0)
     
     #* BUTTONS
