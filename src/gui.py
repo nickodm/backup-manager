@@ -344,6 +344,8 @@ def main():
     root.title(PROJECT_NAME)
     root.resizable(False, False)
     
+    var_compress = tk.BooleanVar(root, True)
+    
     listener = Listener()
     
     root.bind('<Map>', lambda x: listener.resume())
@@ -355,22 +357,54 @@ def main():
     
     menu_main = tk.Menu(root)
     root.config(menu=menu_main)
+
     
-    menu_main.add_command(label='Use Command Prompt',
+    menu_options = tk.Menu(menu_main, tearoff=0)
+    menu_main.add_cascade(menu=menu_options, label='Options')
+
+    menu_options.add_command(label='Use Command Prompt',
                           command=use_command_prompt)
 
-    menu_main.add_command(label='GitHub',
+    menu_options.add_separator()
+
+    menu_options.add_checkbutton(label='Compress Directories',
+                                 variable=var_compress)
+    
+    menu_options.add_separator()
+    
+    menu_options.add_command(label='Save Lists and Resources',
+                             command=lambda: (all_lists.save,
+                                              log_space.write(
+                                                  'Saved lists and resources!'
+                                              )))
+    
+    menu_options.add_separator()
+
+    menu_options.add_command(label='Exit',
+                             command=sys.exit)
+    
+    menu_help = tk.Menu(menu_main, tearoff=0)
+    menu_main.add_cascade(menu=menu_help, label='Help')
+
+    menu_help.add_command(label='Open GitHub',
                           command= lambda: open_web_browser(
                               'https://github.com/nickodm/backup-manager'
                           ))
     
-    menu_main.add_command(
-        label='License',
+    menu_help.add_command(label='Report an Issue',
+                          command= lambda: open_web_browser(
+                              'https://github.com/nickodm/backup-manager/issues'
+                          ))
+    
+    menu_help.add_command(
+        label='View License',
         command= lambda: open_web_browser(
         "https://github.com/nickodm/backup-manager/blob/master/COPYING"
         ))
     
-    menu_main.add_command(label='About',
+    menu_help.add_separator()
+    
+    menu_help.add_command(label='About',
                           command=lambda: tkMsg.showinfo(
                             PROJECT_NAME,
                             f"v{__version__}"))
@@ -408,11 +442,17 @@ def main():
     button_add_dir = Button(frame_buttons, text='Add Dir')
     button_add_dir.grid(row=0, column=1)
     
-    grid_sep(frame_buttons, row=0, column=2, orient='vertical')
+    check_compress = ttk.Checkbutton(frame_buttons,
+                                     variable=var_compress,
+                                     text='Compress Dir',
+                                     padding=10)
+    check_compress.grid(row=0, column=2)
+    
+    grid_sep(frame_buttons, row=0, column=3, orient='vertical')
     
     # Edit Resource
-    button_edit_resource = Button(frame_buttons, text='Edit')
-    button_edit_resource.grid(row=0, column=3)
+    button_edit = Button(frame_buttons, text='Edit')
+    button_edit.grid(row=0, column=4)
 
     # Delete Resource
     button_del = Button(frame_buttons, text='Delete')
@@ -420,14 +460,16 @@ def main():
     
     grid_sep(frame_buttons, row=0, column=6, orient='vertical')
     
+    # Backup
     button_backup = Button(frame_buttons, text='Backup')
     button_backup.grid(row=0, column=7)
 
+    # Restore
     button_restore = Button(frame_buttons, text='Restore')
     button_restore.grid(row=0, column=8)
 
-    button_restore = Button(frame_buttons, text='Copy')
-    button_restore.grid(row=0, column=9)
+    button_copy = Button(frame_buttons, text='Copy')
+    button_copy.grid(row=0, column=9)
 
     grid_sep(frame_buttons, row=0, column=10, orient='vertical')
     
@@ -456,10 +498,10 @@ def main():
     @listener.add
     def activate_edit_delete_buttons():
         if table_resources.selection():
-            button_edit_resource.enable()
+            button_edit.enable()
             button_del.enable()
         else:
-            button_edit_resource.disable()
+            button_edit.disable()
             button_del.disable()
     
     table_resources.grid(row=0, column=0)
