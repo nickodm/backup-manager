@@ -217,7 +217,7 @@ class ResourcesTable(ttk.Treeview):
         return self
     
     def clear(self) -> typ.Self:
-        self.delete(*range(len(self.array)))
+        self.delete(*self.get_children())
         return self
         
     def add_file(self):
@@ -282,19 +282,20 @@ class ResourcesTable(ttk.Treeview):
         
         destiny = Path(destiny).resolve()
         
-    def button_delete(self):
-        #TODO: Fix bug: When an item is deleted, the id doesn't change.
-        for i in self.selection():
-            for j in self.array.pop(int(i)):
-                pass
-            self.delete(i)
+    def button_delete(self) -> None:
+        buff = {i:self.array[int(i)] for i in self.selection()}
+        for index, meta in buff.items():
+            self.delete(index)
+            self.array.remove(meta)
+        
+        self.reload()
         
     def select_all(self) -> typ.Self:
-        self.selection_add([i for i in range(len(self.array))])
+        self.selection_add([i for i in self.get_children()])
         return self
     
     def unselect_all(self) -> typ.Self:
-        self.selection_remove([i for i in range(len(self.array))])
+        self.selection_remove([i for i in self.get_children()])
         return self
     
     def backup(self): ...
