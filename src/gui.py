@@ -474,14 +474,14 @@ def main():
     grid_sep(frame_buttons, row=0, column=6, orient='vertical')
     
     # Backup
-    button_backup = Button(frame_buttons, text='Backup')
+    button_backup = Button(frame_buttons, text='Backup').disable()
     button_backup.grid(row=0, column=7)
 
     # Restore
-    button_restore = Button(frame_buttons, text='Restore')
+    button_restore = Button(frame_buttons, text='Restore').disable()
     button_restore.grid(row=0, column=8)
 
-    button_copy = Button(frame_buttons, text='Copy')
+    button_copy = Button(frame_buttons, text='Copy').disable()
     button_copy.grid(row=0, column=9)
 
     grid_sep(frame_buttons, row=0, column=10, orient='vertical')
@@ -516,8 +516,9 @@ def main():
     add_hotkey('ctrl+a', button_select_all.invoke)
     
     # @listener.add
-    def activate_edit_delete_buttons():
+    def alternate_buttons():
         selection_len = len(table_resources.selection())
+
         if selection_len == 1:
             button_edit.enable()
         else:
@@ -525,11 +526,17 @@ def main():
             
         if selection_len:
             button_del.enable()
+            button_backup.enable()
+            button_restore.enable()
+            button_copy.enable()
         else:
             button_del.disable()
+            button_backup.disable()
+            button_restore.disable()
+            button_copy.disable()
     
     table_resources.bind('<<TreeviewSelect>>', 
-                         lambda x: activate_edit_delete_buttons())
+                         lambda x: alternate_buttons())
     
     def down_key(): #TODO: Support Shift + arrow
         if not table_resources.selection():
