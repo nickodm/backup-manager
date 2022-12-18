@@ -66,23 +66,20 @@ class Listener:
     
     def run(self):
         "Call all the functions periodically."
-        if self._stop:
-            return
+        # Keep while statement; calling self.run() raises RunTimeError.
+        while not self._stop: 
+            for func in self._funcs:
+                if self._stop:
+                    self._stop = False
+                    return
 
-        for func in self._funcs:
-            if self._stop:
-                self._stop = False
-                return
-
-            while self._paused:
+                while self._paused:
+                    sleep(self.interval)
+                
+                func()
                 sleep(self.interval)
-            
-            func()
             sleep(self.interval)
-        sleep(self.interval)
         
-        self.run()
-            
 
 class LogSpace(ScrolledText):
     def write(self, string: str, 
@@ -158,18 +155,22 @@ class ResourcesTable(ttk.Treeview):
         headings = {
             'ID': {
                 'width': 50,
+                'minwidth': 40,
                 'anchor': tk.CENTER
             },
             'Type': {
                 'width': 60,
+                'minwidth': 50,
                 'anchor': tk.CENTER
             },
             'Origin Path': {
                 'width': 440,
+                'minwidth': 100,
                 'anchor': tk.W
             },
             'Destiny Path': {
                 'width': 440,
+                'minwidth': 100,
                 'anchor': tk.W
             }
         }
@@ -216,7 +217,7 @@ class ResourcesTable(ttk.Treeview):
         return self
     
     def clear(self) -> typ.Self:
-        self.delete(*range(len(all_lists)))
+        self.delete(*range(len(self.array)))
         return self
         
     def add_file(self):
@@ -282,11 +283,12 @@ class ResourcesTable(ttk.Treeview):
         destiny = Path(destiny).resolve()
         
     def button_delete(self):
+        #TODO: Fix bug: When an item is deleted, the id doesn't change.
         for i in self.selection():
             for j in self.array.pop(int(i)):
                 pass
             self.delete(i)
-            
+        
     def select_all(self) -> typ.Self:
         self.selection_add([i for i in range(len(self.array))])
         return self
@@ -294,6 +296,12 @@ class ResourcesTable(ttk.Treeview):
     def unselect_all(self) -> typ.Self:
         self.selection_remove([i for i in range(len(self.array))])
         return self
+    
+    def backup(self): ...
+    
+    def restore(self): ...
+    
+    def copy_to(self): ...
     
 
 def main():
@@ -576,7 +584,7 @@ def main():
                                command=export_log)
     log_button_export.grid(row=0, column=1)
     
-    listener.start()
+    # listener.start() # Nothing to repeat.
     root.mainloop()
 
 if __name__ == "__main__":
