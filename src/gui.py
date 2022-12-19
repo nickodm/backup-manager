@@ -285,19 +285,18 @@ class ResourcesTable(ttk.Treeview):
         destiny = Path(destiny).resolve()
         
     def button_delete(self) -> None:
-        buff = {i:self.array[int(i)] for i in self.selection()}
-        for index, meta in buff.items():
+        for index, meta in self.selection().items():
             self.delete(index)
             self.array.remove(meta)
         
         self.reload()
         
     def select_all(self) -> typ.Self:
-        self.selection_add([i for i in self.get_children()])
+        self.selection_add(self.get_children())
         return self
     
     def unselect_all(self) -> typ.Self:
-        self.selection_remove([i for i in self.get_children()])
+        self.selection_remove(self.get_children())
         return self
     
     def button_backup(self): # TODO: Implement Progress Bar
@@ -321,6 +320,10 @@ class ResourcesTable(ttk.Treeview):
                     self.log.write(f'"{meta.name}" cannot be copied.')
     
     def copy_to(self): ...
+    
+    def selection(self) -> dict[str, BackupMeta]:
+        """Get the selected items."""
+        return {i:self.array[int(i)] for i in super().selection()}
     
 
 def main():
