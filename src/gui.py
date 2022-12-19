@@ -561,6 +561,7 @@ def main():
         table_resources.selection_set(n)
         
     add_hotkey('up', up_key)
+    add_hotkey('delete', table_resources.button_delete)
     
     table_resources.grid(row=0, column=0)
     
