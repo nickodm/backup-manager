@@ -99,11 +99,11 @@ class LogSpace(ScrolledText):
         self['state'] = old_state
         return self
         
-    def enable(self):
+    def read_and_write(self):
         self['state'] = tk.NORMAL
         return self
     
-    def disable(self):
+    def read_only(self):
         self['state'] = tk.DISABLED
         return self
     
@@ -565,7 +565,7 @@ def main():
         if not table_resources.selection():
             return table_resources.selection_set(0)
         
-        n = int(table_resources.selection()[0]) + 1
+        n = int([k for k in table_resources.selection()][0]) + 1
         if n == len(table_resources.array):
             return table_resources.selection_set(0)
             
@@ -577,7 +577,7 @@ def main():
         if not table_resources.selection():
             return table_resources.selection_set(len(table_resources.array) - 1)
         
-        n = int(table_resources.selection()[0]) - 1
+        n = int([k for k in table_resources.selection()][0]) - 1
         if n == -1:
             return table_resources.selection_set(len(table_resources.array) - 1)
             
