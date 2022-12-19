@@ -591,14 +591,14 @@ def main():
     #*   LOAD BAR
     #****************
 
-    pbar = ttk.Progressbar(frame_load_bar, length=910)
-    pbar.grid(row=0, column=0)
+    pbar = ttk.Progressbar(frame_load_bar, length=1010)
+    pbar.grid(row=0, column=0, sticky='nswe')
 
     #****************
     #*    LOGS
     #****************
     
-    log_space = LogSpace(frame_log, height=10, width=89).disable()
+    log_space = LogSpace(frame_log, height=10, width=99).disable()
     log_space.write("Welcome to the software!")
     log_space.write(
         "Press and hold CTRL or SHIFT (minus) key to select more than one "
