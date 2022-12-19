@@ -88,6 +88,7 @@ class LogSpace(ScrolledText):
         self['state'] = 'normal'
         self.insert(index, string + endline)
         self['state'] = old_state
+        self.see(index)
         
         return len(string)
     
@@ -149,6 +150,7 @@ class Button(tk.Button):
 class ResourcesTable(ttk.Treeview):
     def __init__(self, master, *args, **kw):
         super().__init__(master, *args, **kw)
+        self.log: LogSpace = None
         
         self.column('#0', width=0, stretch=False)
         
@@ -298,9 +300,25 @@ class ResourcesTable(ttk.Treeview):
         self.selection_remove([i for i in self.get_children()])
         return self
     
-    def backup(self): ...
+    def button_backup(self): # TODO: Implement Progress Bar
+        for i in self.selection():
+            for result, meta in self.array.backup(int(i)):
+                if result:
+                    self.log.write(f'"{meta.name}" was successfully copied.')
+                elif not meta.are_different():
+                    self.log.write(f'"{meta.name}" has no changes. It was not copied.')
+                else:
+                    self.log.write(f'"{meta.name}" cannot be copied.')
     
-    def restore(self): ...
+    def button_restore(self):
+        for i in self.selection():
+            for result, meta in self.array.restore(int(i)):
+                if result:
+                    self.log.write(f'"{meta.name}" was successfully copied.')
+                elif not meta.are_different():
+                    self.log.write(f'"{meta.name}" has no changes. It was not copied.')
+                else:
+                    self.log.write(f'"{meta.name}" cannot be copied.')
     
     def copy_to(self): ...
     
@@ -504,7 +522,9 @@ def main():
     
     button_add_file.config(command=table_resources.add_file)
     button_del.config(command=table_resources.button_delete)
-    
+    button_backup.config(command=table_resources.button_backup)
+    button_restore.config(command=table_resources.button_restore)
+
     def button_select_all_command():
         if len(table_resources.selection()) == len(table_resources.array):
             table_resources.unselect_all()
@@ -562,6 +582,8 @@ def main():
         
     add_hotkey('up', up_key)
     add_hotkey('delete', table_resources.button_delete)
+    add_hotkey('b', table_resources.button_backup)
+    add_hotkey('r', table_resources.button_restore)
     
     table_resources.grid(row=0, column=0)
     
@@ -584,6 +606,8 @@ def main():
     log_space.write("-"*72)
     log_space.grid(row=0, column=0)
     
+    table_resources.log = log_space
+
     #* BUTTONS
     log_button_clear = Button(frame_log_buttons, text='Clear',
                                  command=log_space.clear)
